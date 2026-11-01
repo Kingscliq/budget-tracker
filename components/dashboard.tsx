@@ -571,7 +571,6 @@ export default function Dashboard({
         <nav>
           {[
             ["Overview", LayoutDashboard],
-            ["Expenses", ReceiptText],
             ["Savings & forex", PiggyBank],
             ["Transactions", History],
           ].map(([label, Icon]) => {
@@ -590,7 +589,7 @@ export default function Dashboard({
               >
                 <I size={19} />
                 <span>{String(label)}</span>
-                {label === "Overview" && <span className="nav-active-dot" />}
+                {view === label && <span className="nav-active-dot" />}
               </button>
             );
           })}
@@ -651,11 +650,9 @@ export default function Dashboard({
               <h1>
                 {view === "Overview"
                   ? "Make room for what matters."
-                  : view === "Expenses"
-                    ? "Every expense, in perspective."
-                    : view === "Transactions"
-                      ? "Follow the money."
-                      : "Invest in your future."}
+                  : view === "Transactions"
+                    ? "Follow the money."
+                    : "Invest in your future."}
               </h1>
               <p>
                 {view === "Overview"
@@ -875,9 +872,13 @@ export default function Dashboard({
                         </p>
                         <Button
                           variant="outline"
-                          onClick={() => setView("Expenses")}
+                          onClick={() => {
+                            setView("Overview");
+                            setFilter("All items");
+                            setSearch("");
+                          }}
                         >
-                          Go to expenses <ArrowRight size={15} />
+                          Go to overview <ArrowRight size={15} />
                         </Button>
                       </div>
                     )}
