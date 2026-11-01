@@ -15,7 +15,7 @@ const steps = [
   {
     target: "savings",
     title: "Make room for future you",
-    text: "Savings and forex have their own targets. They reduce available cash, but stay separate from spending.",
+    text: "Savings are part of your monthly expenses. Set a target here and record contributions in your main budget.",
   },
   {
     target: "settings",

@@ -42,7 +42,6 @@ import { Button } from "./ui/button";
 import { Dialog } from "./ui/dialog";
 import {
   actual,
-  allocation,
   categories,
   money,
   newBudget,
@@ -309,7 +308,7 @@ export default function Dashboard({
   function openExpense(e?: Expense) {
     setEditing(e ?? null);
     setName(e?.name ?? "");
-    setCategory(e?.category ?? "Living");
+    setCategory(e?.category ?? (view === "Savings" ? "Savings" : "Living"));
     setAmount(e ? String(e.expected_amount / 100) : "");
     setRecurring(e?.is_recurring ?? true);
     setFormError("");
@@ -507,9 +506,7 @@ export default function Dashboard({
       </div>
     );
   const rows = budget.expenses
-    .filter((e) =>
-      view === "Savings & forex" ? allocation(e) : !allocation(e),
-    )
+    .filter((e) => (view === "Savings" ? e.category === "Savings" : true))
     .filter((e) => e.name.toLowerCase().includes(search.toLowerCase()))
     .filter(
       (e) =>
@@ -520,29 +517,17 @@ export default function Dashboard({
             ? !e.is_active
             : status(e) === filter),
     );
-  const byCategory = categories
-    .filter((c) => c !== "Savings" && c !== "Forex")
-    .map((c) => ({
-      name: c,
-      total: budget.expenses
-        .filter((e) => e.category === c)
-        .reduce((s, e) => s + actual(e), 0),
-    }));
+  const byCategory = categories.map((c) => ({
+    name: c,
+    total: budget.expenses
+      .filter((e) => e.category === c)
+      .reduce((s, e) => s + actual(e), 0),
+  }));
   const chartData = [
     {
-      name: "Expenses",
-      Expected: summary.expected / 100,
-      Actual: summary.spent / 100,
-    },
-    {
-      name: "Savings",
-      Expected: summary.savings / 100,
-      Actual: summary.savingsActual / 100,
-    },
-    {
-      name: "Forex",
-      Expected: summary.forex / 100,
-      Actual: summary.forexActual / 100,
+      name: "Monthly budget",
+      Expected: summary.totalExpected / 100,
+      Actual: summary.totalActual / 100,
     },
   ];
   const trend = [...budgets]
@@ -555,7 +540,7 @@ export default function Dashboard({
     .slice(-6)
     .map((b) => ({
       name: monthName(b.month).slice(0, 3) + " " + String(b.year).slice(2),
-      Spent: totals(b).spent / 100,
+      Spent: totals(b).totalActual / 100,
     }));
   const historyExpense = budget.expenses.find((e) => e.id === editing?.id);
   return (
@@ -571,7 +556,7 @@ export default function Dashboard({
         <nav>
           {[
             ["Overview", LayoutDashboard],
-            ["Savings & forex", PiggyBank],
+            ["Savings", PiggyBank],
             ["Transactions", History],
           ].map(([label, Icon]) => {
             const I = Icon as typeof Wallet;
@@ -754,41 +739,36 @@ export default function Dashboard({
                   <ReceiptText size={17} />
                 </span>
               </div>
-              <div className="stat-value">{money(summary.expected)}</div>
+              <div className="stat-value">{money(summary.totalExpected)}</div>
               <div className="stat-foot">
                 <span className="tiny-dot" />{" "}
-                {
-                  budget.expenses.filter((e) => !allocation(e) && e.is_active)
-                    .length
-                }{" "}
-                active expense items
+                {budget.expenses.filter((e) => e.is_active).length} active
+                expense items
               </div>
             </div>
             <div className="stat-card">
               <div className="stat-top">
-                Actual spending{" "}
+                Actual expenses{" "}
                 <span className="stat-icon">
                   <ArrowUpRight size={17} />
                 </span>
               </div>
-              <div className="stat-value">{money(summary.spent)}</div>
+              <div className="stat-value">{money(summary.totalActual)}</div>
               <div className="stat-foot">
-                {money(summary.pending)} still pending
+                {money(summary.totalPending)} still pending
               </div>
             </div>
             <div className="stat-card">
               <div className="stat-top">
-                Savings & forex{" "}
+                Savings{" "}
                 <span className="stat-icon">
                   <PiggyBank size={17} />
                 </span>
               </div>
-              <div className="stat-value">
-                {money(summary.savings + summary.forex)}
-              </div>
+              <div className="stat-value">{money(summary.savings)}</div>
               <div className="stat-foot">
-                {money(summary.savingsActual + summary.forexActual)} contributed
-                so far
+                {money(summary.savingsActual)} contributed so far · included in
+                expenses
               </div>
             </div>
             <div className="stat-card featured">
@@ -889,13 +869,11 @@ export default function Dashboard({
                   <div className="panel-heading">
                     <div>
                       <h2>
-                        {view === "Savings & forex"
-                          ? "Savings & forex"
-                          : "Your monthly plan"}{" "}
+                        {view === "Savings" ? "Savings" : "Your monthly plan"}{" "}
                         <span className="count-pill">{rows.length} items</span>
                       </h2>
                       <p>
-                        {view === "Savings & forex"
+                        {view === "Savings"
                           ? "Build your reserves, one contribution at a time."
                           : "A place for every naira. Adjust as life happens."}
                       </p>
@@ -905,7 +883,8 @@ export default function Dashboard({
                       disabled={busy}
                       onClick={() => openExpense()}
                     >
-                      <Plus size={16} /> Add expense
+                      <Plus size={16} />{" "}
+                      {view === "Savings" ? "Add savings" : "Add expense"}
                     </Button>
                   </div>
                   <div className="table-toolbar">
@@ -1188,16 +1167,15 @@ export default function Dashboard({
                 </div>
                 <div className="cash-value">{money(summary.cashRemaining)}</div>
                 <p>
-                  Income minus all recorded payments, including savings & forex
-                  deposits.
+                  Income minus all recorded payments, including savings
+                  contributions.
                 </p>
                 <div className="cash-divider" />
                 <div>
-                  <span>Still to set aside</span>
+                  <span>Savings still to set aside</span>
                   <strong>
                     {money(
-                      Math.max(0, summary.savings - summary.savingsActual) +
-                        Math.max(0, summary.forex - summary.forexActual),
+                      Math.max(0, summary.savings - summary.savingsActual),
                     )}
                   </strong>
                 </div>
@@ -1217,7 +1195,6 @@ export default function Dashboard({
                     summary.savingsActual,
                     PiggyBank,
                   ],
-                  ["Forex fund", summary.forex, summary.forexActual, Globe2],
                 ].map(([label, target, paid, Icon]) => {
                   const I = Icon as typeof Wallet;
                   const percent =
@@ -1246,7 +1223,7 @@ export default function Dashboard({
                 <button
                   className="text-link"
                   onClick={() => {
-                    setView("Savings & forex");
+                    setView("Savings");
                     setFilter("All items");
                     setSearch("");
                   }}
@@ -1258,10 +1235,10 @@ export default function Dashboard({
                 <div className="panel-heading">
                   <div>
                     <h2>Where it’s going</h2>
-                    <p>Actual spending by category</p>
+                    <p>Payments by category</p>
                   </div>
                 </div>
-                {summary.spent > 0 ? (
+                {summary.totalActual > 0 ? (
                   <div className="category-list">
                     {byCategory
                       .filter((c) => c.total > 0)
@@ -1281,7 +1258,7 @@ export default function Dashboard({
                           <div className="category-track">
                             <span
                               style={{
-                                width: `${(c.total / summary.spent) * 100}%`,
+                                width: `${(c.total / summary.totalActual) * 100}%`,
                                 background: COLORS[i % COLORS.length],
                               }}
                             />
@@ -1314,9 +1291,10 @@ export default function Dashboard({
             <section className="panel trend-panel">
               <div className="panel-heading">
                 <div>
-                  <h2>Your spending over time</h2>
+                  <h2>Your outgoings over time</h2>
                   <p>
-                    Consumption expenses only. Savings and forex stay separate.
+                    Recorded payments across all budget items, including
+                    savings.
                   </p>
                 </div>
                 <span className="count-pill">

@@ -84,6 +84,11 @@ export function totals(b: Budget) {
   return {
     expected,
     spent,
+    totalExpected: sum(b.expenses, planned),
+    totalActual: sum(b.expenses, actual),
+    totalPending: sum(b.expenses, (e) =>
+      e.is_active ? Math.max(0, e.expected_amount - actual(e)) : 0,
+    ),
     savings,
     forex,
     savingsActual: sum(

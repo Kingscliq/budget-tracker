@@ -98,3 +98,32 @@ test("reject fractional kobo, negative, unsafe and invalid expense inputs", () =
     }),
   );
 });
+
+test("inclusive expense totals count savings once and retain correct remaining budget", () => {
+  const b = newBudget(11, 2026, true),
+    t = totals(b);
+  assert.equal(t.totalExpected, 50900000);
+  assert.equal(t.totalActual, 0);
+  assert.equal(t.totalPending, 50900000);
+  assert.equal(t.budgetRemaining, b.salary - t.totalExpected);
+});
+test("savings contributions appear in actual expenses without double-counting cash", () => {
+  const b = newBudget(11, 2026, true),
+    e = b.expenses.find((e) => e.category === "Savings")!;
+  e.payments = [
+    {
+      id: crypto.randomUUID(),
+      expense_id: e.id,
+      amount: 2000000,
+      paid_at: "2026-11-01",
+    },
+  ];
+  const t = totals(b);
+  assert.equal(t.totalActual, 2000000);
+  assert.equal(t.savingsActual, 2000000);
+  assert.equal(t.totalPending, 48900000);
+  assert.equal(t.cashRemaining, 58000000);
+  assert.equal(t.budgetRemaining, 9100000);
+  e.is_active = false;
+  assert.equal(totals(b).budgetRemaining, b.salary - totals(b).totalExpected);
+});

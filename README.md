@@ -68,3 +68,7 @@ Tests cover financial totals and partial payments, cancellation/restoration, sav
 Phone expenses use labeled cards, 44px touch targets and readable inputs. Bottom navigation respects device safe areas. Dialogs and the tour fit small viewports; keyboard zoom remains enabled. Tablets and desktop retain the table.
 
 Deploy to a Next.js-compatible host. Local-only mode needs no Supabase configuration. Optional sync needs the migration, server-side environment variables, Email auth and working SMTP delivery. The owner-private deployment gate used by the legacy single-workspace app is no longer needed for the authenticated sync architecture.
+
+## Savings in the main budget
+
+Overview includes every allocation, including Savings and existing optional Forex items. The displayed planned/actual expense totals and payment charts include savings contributions. Savings has a separate detail view and progress card, showing only the Savings category as a breakdown of the total. Savings is never subtracted twice: budget remaining is income minus all planned allocations, and cash remaining is income minus all recorded payments. Internal consumption-only totals remain available separately.
