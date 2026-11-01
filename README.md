@@ -50,3 +50,9 @@ npm start
 Tests cover default totals, partial and multiple payments, cancellation/restoration, savings, overspending, salary scenarios and input validation. SQL is supplied for your own Supabase project; it requires integration verification after connection. CSV export includes all monthly allocations and their payment status. Multiple open browser tabs do not live-sync; reload to see changes made elsewhere.
 
 Deploy to a Next.js-compatible host with an external owner-only access gateway and server environment variables. Do not deploy database-backed mode to a public unauthenticated URL. No Supabase account or production hosting is provisioned by this repository.
+
+## Mobile layout
+
+At phone widths (up to 640px), expenses become labeled cards with all actions in view, larger touch targets, full-width search and add controls, and readable form fields. The bottom navigation accounts for device safe areas. Forms scroll within the available viewport; zoom remains enabled. Tablets and desktops retain the expense table.
+
+Responsive QA uses browser viewports at 320, 390, 430, 768 and 1440px, checks document overflow and phone touch targets, and opens the expense and payment forms. These checks emulate viewport sizes; they are not physical iOS/Android device tests.

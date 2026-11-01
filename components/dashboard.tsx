@@ -481,6 +481,7 @@ export default function Dashboard({
             return (
               <button
                 aria-label={String(label)}
+                aria-pressed={view === label}
                 key={String(label)}
                 className={`nav-item ${view === label ? "active" : ""}`}
                 onClick={() => {
@@ -862,10 +863,11 @@ export default function Dashboard({
                                 </button>
                               </div>
                             </td>
-                            <td className="number">
+                            <td className="number" data-label="Planned">
                               {money(e.expected_amount)}
                             </td>
                             <td
+                              data-label="Actual"
                               className={`number ${actual(e) === 0 ? "muted" : ""}`}
                             >
                               <button
@@ -879,7 +881,7 @@ export default function Dashboard({
                                 {money(actual(e))}
                               </button>
                             </td>
-                            <td>
+                            <td data-label="Status">
                               <button
                                 disabled={!e.is_active || busy}
                                 className={`status status-${status(e).toLowerCase().replaceAll(" ", "-")}`}
@@ -894,7 +896,7 @@ export default function Dashboard({
                                 {status(e)}
                               </button>
                             </td>
-                            <td className="center">
+                            <td className="center" data-label="Active">
                               <Switch.Root
                                 className="switch"
                                 checked={e.is_active}
@@ -926,6 +928,9 @@ export default function Dashboard({
                                   onClick={() => openPayment(e)}
                                 >
                                   <Plus size={16} />
+                                  <span className="mobile-action-label">
+                                    Record payment
+                                  </span>
                                 </button>
                                 <button
                                   className="icon-button delete-action"
@@ -1038,14 +1043,14 @@ export default function Dashboard({
                           }}
                         />
                         <Bar
-                      isAnimationActive={false}
+                          isAnimationActive={false}
                           dataKey="Expected"
                           fill="#dce7db"
                           radius={[4, 4, 0, 0]}
                           maxBarSize={28}
                         />
                         <Bar
-                      isAnimationActive={false}
+                          isAnimationActive={false}
                           dataKey="Actual"
                           fill="#3c7258"
                           radius={[4, 4, 0, 0]}
@@ -1327,6 +1332,7 @@ export default function Dashboard({
                 autoFocus={modal !== "expense"}
                 required
                 type="number"
+                inputMode="decimal"
                 min={modal === "salary" ? "0" : "0.01"}
                 max="1000000000"
                 step="0.01"
