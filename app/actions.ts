@@ -1,88 +1,165 @@
 "use server";
-import { db } from "@/lib/supabase";
 import {
-  validateAmount,
-  validateExpense,
-  validateMonth,
-  type Budget,
-  type ExpenseInput,
-} from "@/lib/budget";
-function check(error: { message: string } | null) {
+  authClient,
+  linkAuthClient,
+  clearSession,
+  identity,
+  storeSession,
+  syncConfigured,
+} from "@/lib/supabase";
+import { validateBudgets } from "@/lib/backup";
+import type { Budget } from "@/lib/budget";
+export type CloudBudget = {
+  email: string;
+  budgets: Budget[] | null;
+  revision: number | null;
+};
+function failure(error: { code?: string; message: string } | null) {
   if (error) {
-    console.error("Budget database:", error.message);
-    throw new Error("Could not save your budget. Please try again.");
+    console.error("Pocket sync:", error.code);
+    throw new Error(
+      error.code === "42P01" || error.code === "PGRST205"
+        ? "Cloud sync needs its database migration. Your budget is safe on this device."
+        : "Could not sync. Your budget is safe on this device. Please try again.",
+    );
   }
 }
-export async function loadBudgets(): Promise<Budget[]> {
-  const client = db();
-  const { data, error } = await client
-    .from("budgets")
-    .select("*,expenses(*,payments(*))")
-    .order("year")
-    .order("month");
-  check(error);
-  return (data ?? []) as Budget[];
-}
-export async function createMonth(month: number, year: number, seed = false) {
-  validateMonth(month, year);
-  const client = db();
-  // The database function atomically creates and seeds only the first workspace budget.
-  const { error } = await client.rpc("create_budget_month", {
-    p_month: month,
-    p_year: year,
-    p_seed: seed,
+async function requestSyncCodeImpl(email: string) {
+  if (
+    typeof email !== "string" ||
+    email.length > 254 ||
+    !/^\S+@\S+\.\S+$/.test(email.trim())
+  )
+    throw new Error("Enter a valid email address.");
+  const { error } = await (
+    await linkAuthClient()
+  ).auth.signInWithOtp({
+    email: email.trim().toLowerCase(),
+    options: {
+      shouldCreateUser: true,
+      emailRedirectTo: `${(process.env.APP_URL || "http://127.0.0.1:3000").replace(/\/$/, "")}/auth/confirm`,
+    },
   });
-  check(error);
-  return loadBudgets();
+  if (error)
+    throw new Error(
+      "Could not send a sign-in email. Please wait a minute and try again.",
+    );
 }
-export async function setSalary(id: string, salary: number) {
-  validateAmount(salary, true);
-  const { error } = await db().from("budgets").update({ salary }).eq("id", id);
-  check(error);
-}
-export async function saveExpense(
-  budgetId: string,
-  id: string | null,
-  input: ExpenseInput,
-) {
-  validateExpense(input);
-  const value = { ...input, name: input.name.trim() };
-  const q = id
-    ? db().from("expenses").update(value).eq("id", id).eq("budget_id", budgetId)
-    : db()
-        .from("expenses")
-        .insert({ ...value, budget_id: budgetId });
-  const { error } = await q;
-  check(error);
-}
-export async function toggleExpense(id: string, active: boolean) {
-  if (typeof active !== "boolean") throw new Error("Invalid status.");
-  const { error } = await db()
-    .from("expenses")
-    .update({ is_active: active })
-    .eq("id", id);
-  check(error);
-}
-export async function deleteExpense(id: string) {
-  const { error } = await db().from("expenses").delete().eq("id", id);
-  check(error);
-}
-export async function recordPayment(id: string, amount: number, date: string) {
-  validateAmount(amount);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)))
-    throw new Error("Choose a valid payment date.");
-  const { error } = await db().rpc("record_budget_payment", {
-    p_expense_id: id,
-    p_amount: amount,
-    p_paid_at: date,
+async function verifySyncCodeImpl(email: string, token: string) {
+  if (
+    typeof email !== "string" ||
+    email.length > 254 ||
+    typeof token !== "string" ||
+    !/^\d{6,10}$/.test(token)
+  )
+    throw new Error("Enter the code from your email.");
+  const { data, error } = await authClient().auth.verifyOtp({
+    email: email.trim().toLowerCase(),
+    token,
+    type: "email",
   });
-  check(error);
+  if (error || !data.session)
+    throw new Error("That code is invalid or expired. Request a new one.");
+  await storeSession(data.session);
+  return loadCloudImpl();
 }
-export async function removePayment(id: string) {
-  const { error } = await db().from("payments").delete().eq("id", id);
-  check(error);
+async function loadCloudImpl(): Promise<CloudBudget | null> {
+  if (!syncConfigured()) return null;
+  const auth = await identity();
+  if (!auth) return null;
+  const { data, error } = await auth.client
+    .from("budget_workspaces")
+    .select("budget_data,revision")
+    .eq("user_id", auth.user.id)
+    .maybeSingle();
+  failure(error);
+  return {
+    email: auth.user.email!,
+    budgets: data ? validateBudgets(data.budget_data) : null,
+    revision: data?.revision ?? null,
+  };
 }
-export async function copyPrevious(id: string) {
-  const { error } = await db().rpc("copy_previous_budget", { target_id: id });
-  check(error);
+async function saveCloudImpl(
+  value: Budget[],
+  expectedRevision: number | null,
+): Promise<number> {
+  const budgets = validateBudgets(value);
+  if (
+    expectedRevision !== null &&
+    (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1)
+  )
+    throw new Error("Invalid sync version.");
+  const auth = await identity();
+  if (!auth)
+    throw new Error(
+      "Please verify your email again to resume sync. Your budget is still on this device.",
+    );
+  if (expectedRevision === null) {
+    const { error } = await auth.client
+      .from("budget_workspaces")
+      .insert({ user_id: auth.user.id, budget_data: budgets, revision: 1 });
+    if (error?.code === "23505")
+      throw new Error(
+        "Another device saved a budget. Open Settings to choose the latest cloud copy or keep this device’s version.",
+      );
+    failure(error);
+    return 1;
+  }
+  const next = expectedRevision + 1;
+  const { data, error } = await auth.client
+    .from("budget_workspaces")
+    .update({
+      budget_data: budgets,
+      revision: next,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", auth.user.id)
+    .eq("revision", expectedRevision)
+    .select("revision")
+    .maybeSingle();
+  failure(error);
+  if (!data)
+    throw new Error(
+      "Another device has newer changes. Your edits are safe here. Open Settings to choose which copy to use.",
+    );
+  return next;
+}
+async function disconnectSyncImpl() {
+  try {
+    const auth = await identity();
+    if (auth) await authClient().auth.admin.signOut(auth.token, "local");
+  } finally {
+    await clearSession();
+  }
+}
+
+// Expected failures are serialized explicitly so production builds retain useful messages.
+type Result<T> = { ok: true; data: T } | { ok: false; error: string };
+async function respond<T>(fn: () => Promise<T>): Promise<Result<T>> {
+  try {
+    return { ok: true, data: await fn() };
+  } catch (e) {
+    return {
+      ok: false,
+      error:
+        e instanceof Error
+          ? e.message
+          : "Could not complete sync. Your device copy is safe.",
+    };
+  }
+}
+export async function requestSyncCode(email: string) {
+  return respond(() => requestSyncCodeImpl(email));
+}
+export async function verifySyncCode(email: string, token: string) {
+  return respond(() => verifySyncCodeImpl(email, token));
+}
+export async function loadCloud() {
+  return respond(loadCloudImpl);
+}
+export async function saveCloud(budgets: Budget[], revision: number | null) {
+  return respond(() => saveCloudImpl(budgets, revision));
+}
+export async function disconnectSync() {
+  return respond(disconnectSyncImpl);
 }

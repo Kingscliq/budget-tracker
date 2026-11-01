@@ -1,6 +1,6 @@
 # Pocket — monthly budget tracker
 
-A responsive, single-user budget app using Next.js App Router, strict TypeScript, Tailwind CSS, shadcn-style Radix UI components, Lucide, Recharts and Supabase. No login or separate backend.
+A device-first budget app using Next.js App Router, TypeScript, Tailwind, Radix UI, Lucide, Recharts and optional Supabase sync. Start immediately without an account, email or database connection.
 
 ## Run locally
 
@@ -11,48 +11,60 @@ npm ci
 npm run dev
 ```
 
-Open http://127.0.0.1:3000. Without database environment variables, the app explicitly uses **demo mode**: data is saved in this browser's localStorage, not Supabase. Demo data is isolated from database data and is not automatically imported when connecting Supabase. Clear site data to reset the demo.
+Open http://127.0.0.1:3000. Budgets save to this browser's localStorage, even when Supabase environment variables exist. No budget data is sent to the server until the visitor explicitly enables sync and verifies their email. The first visit includes a short, dismissible four-step tooltip tour; replay it from Settings.
 
-## Connect Supabase
+On hosts where filesystem events are unavailable:
 
-1. Create a Supabase project.
-2. Run `supabase/migrations/001_budget.sql` in its SQL editor (or apply with the Supabase CLI).
-3. Copy `.env.example` to `.env.local` and fill `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` with your project's URL and server secret/service-role key. These have no `NEXT_PUBLIC_` prefix and the client is protected by `server-only`.
-4. Set `BUDGET_PRIVATE_ACCESS_CONFIRMED=true` only when running locally or behind a private access gateway. Restart the server. The indicator will say “Connected to Supabase”.
+```sh
+WATCHPACK_POLLING=true npm run dev -- --webpack
+```
 
-The app intentionally has no authentication. Database-backed pages AND Server Actions must stay behind the same private access boundary. Keep the development server bound to loopback; do not expose an unprotected production deployment. The flag is an explicit configuration acknowledgement, not an access-control mechanism. Database tables have RLS enabled without browser access policies; mutations use server-only actions. Database errors are logged server-side and shown as generic errors in the UI.
+Use the same origin consistently: `localhost` and `127.0.0.1` have different browser storage. Clearing site data or using a different browser removes access to that device copy. Settings includes full JSON backup and restore; the CSV report is not a restorable backup. If browser storage is unavailable, Pocket reports the save error rather than claiming changes were saved.
 
-The first database month is seeded atomically with the twelve default allocations and zero payments. Additional months start empty. “Copy previous month” is available on empty months only: it copies income and active recurring allocations, resets payment history and excludes cancelled and one-off items. November 2026 is not hardcoded; the initial month follows the browser's date.
+## Optional sync setup
+
+1. Create a Supabase project and enable Email authentication. No anonymous sign-in is required.
+2. Apply `supabase/migrations/002_optional_sync.sql`. It can run independently; migration 001 is only for the original legacy shared workspace and is no longer used by the app.
+3. Copy `.env.example` to `.env.local`; set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to a server secret/service-role key. Never use a `NEXT_PUBLIC_` prefix. The privileged key stays behind `server-only` imports.
+4. Set `APP_URL` to the app's exact origin (locally `http://127.0.0.1:3000`). In Supabase Authentication → URL Configuration set Site URL to that origin and add its `/auth/confirm` URL to the redirect allowlist. Email uses the default sign-in link; a server-side PKCE callback exchanges it for a session. Request and open the link in the same browser. Configure custom SMTP for production delivery outside the project team; Supabase's default sender restricts recipients and rate-limits delivery. No email template changes are required.
+5. Optionally, a custom SMTP email template can include `{{ .Token }}` instead of a link. The UI supports 6–10 digit code entry too.
+6. Restart the app. Email entry appears only after the visitor enables Settings → Sync across devices. Verifying a link opens Settings; the visitor still explicitly chooses whether to upload a device budget or load the cloud copy.
+
+Verification alone never uploads a budget. Users explicitly choose “Turn on sync & upload budget” for a new account, or choose a copy if a cloud budget already exists. Loading a cloud copy preserves the previous device copy in Settings. Replacing an existing cloud copy requires a separate confirmation and offers a backup download. Switching sync off keeps both the device copy and the cloud copy, signs out this device's session, and revokes no other devices.
+
+Each verified account owns one `budget_workspaces` row, containing a versioned JSON snapshot of all its months. Server Actions validate the data, verify the user's session against Supabase Auth, and use the user's JWT for database access. Row-level security restricts reads/inserts/updates to `auth.uid() = user_id`; there is no anonymous table access. Session credentials are in HttpOnly, SameSite cookies; production HTTPS cookies are Secure. `POCKET_LOCAL_HTTP=true` is only for a local production-build test over HTTP.
+
+Changes save on-device first. A failed upload or revision conflict pauses sync and preserves the unsynced edits. Settings lets users choose the cloud copy or explicitly replace it with the device copy. Newer cloud data is never silently overwritten. Reopening a synced device loads the cloud copy only when there are no pending local edits. Other active devices see updates on reload or through Settings → Review cloud copy; this is not live collaboration or automatic merging. Multiple tabs sharing the same browser storage should not edit concurrently.
+
+## Existing shared data
+
+The former `budgets`, `expenses` and `payments` tables are left untouched and are no longer queried by the app. Their service-only access remains unchanged. They are never exposed or assigned to a new visitor. Existing browser budgets remain in `pocket-budget-v1`. To carry old shared data forward, export it privately as a Pocket-format backup and restore it on the owner's device before opting into sync.
 
 ## Money rules
 
-All values are integer kobo (₦1 = 100 kobo). Actual amounts always sum payment records. Inputs accept at most two decimal places and up to ₦1 billion per amount.
+All values are integer kobo (₦1 = 100 kobo); actual amounts always sum recorded payments.
 
-- Planned expenses = active consumption allocations (or actual paid if larger) plus retained payments on cancelled items.
-- Pending expenses = unpaid portion of active consumption items.
-- Savings / forex allocated = active target (or actual paid if larger), plus retained cancelled contributions.
-- Budget remaining = income − planned expenses − savings allocated − forex allocated.
-- Cash remaining = income − every recorded payment, including savings and forex deposits.
-- Cancelling frees only the unpaid allocation, retains actual payments and shows Cancelled. Restoring brings the allocation back. Deleting removes the item and its payment history after confirmation.
-- Payments may exceed their target; the plan then grows to cover the actual amount. Paid means actual ≥ expected. Removing an erroneous payment recalculates status and all totals.
+- Planned consumption = active allocations (or actual paid if larger), plus retained payments on cancelled items.
+- Pending consumption = unpaid portion of active consumption items.
+- Savings / forex = active targets (or actual paid if larger), plus retained cancelled contributions.
+- Budget remaining = income − planned consumption − savings − forex.
+- Cash remaining = income − every payment, including savings and forex deposits.
+- Cancelling frees only unpaid allocations. Restoring reinstates them. Deleting removes the item and payments after confirmation.
 
-At ₦600,000 income, defaults allocate ₦359,000 to consumption, ₦100,000 to savings and ₦50,000 to forex. This leaves ₦91,000 in the budget and ₦600,000 cash before payments. At ₦500,000 the same plan is ₦9,000 over budget.
+The initial ₦600,000 salary plan allocates ₦359,000 to consumption, ₦100,000 to savings and ₦50,000 to forex. It leaves ₦91,000 in the budget and ₦600,000 cash before payments. At ₦500,000, the same plan is ₦9,000 over budget. Additional months start empty; copying the previous month includes active recurring items without payments.
 
-## Verification and deployment
+## Checks
 
 ```sh
 npm test
-npm run typecheck
 npm run build
-npm start
+npm run typecheck
 ```
 
-Tests cover default totals, partial and multiple payments, cancellation/restoration, savings, overspending, salary scenarios and input validation. SQL is supplied for your own Supabase project; it requires integration verification after connection. CSV export includes all monthly allocations and their payment status. Multiple open browser tabs do not live-sync; reload to see changes made elsewhere.
+Tests cover financial totals and partial payments, cancellation/restoration, savings, overspending, backup round-trips, malformed records, invalid ownership references, duplicate months/IDs and invalid dates. Validate the deployed email delivery flow with an email address you control. Browser QA uses emulated viewport sizes, not physical iOS/Android devices.
 
-Deploy to a Next.js-compatible host with an external owner-only access gateway and server environment variables. Do not deploy database-backed mode to a public unauthenticated URL. No Supabase account or production hosting is provisioned by this repository.
+## Mobile and deployment
 
-## Mobile layout
+Phone expenses use labeled cards, 44px touch targets and readable inputs. Bottom navigation respects device safe areas. Dialogs and the tour fit small viewports; keyboard zoom remains enabled. Tablets and desktop retain the table.
 
-At phone widths (up to 640px), expenses become labeled cards with all actions in view, larger touch targets, full-width search and add controls, and readable form fields. The bottom navigation accounts for device safe areas. Forms scroll within the available viewport; zoom remains enabled. Tablets and desktops retain the expense table.
-
-Responsive QA uses browser viewports at 320, 390, 430, 768 and 1440px, checks document overflow and phone touch targets, and opens the expense and payment forms. These checks emulate viewport sizes; they are not physical iOS/Android device tests.
+Deploy to a Next.js-compatible host. Local-only mode needs no Supabase configuration. Optional sync needs the migration, server-side environment variables, Email auth and working SMTP delivery. The owner-private deployment gate used by the legacy single-workspace app is no longer needed for the authenticated sync architecture.

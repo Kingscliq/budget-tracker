@@ -2291,3 +2291,288 @@ a {
     transition: none !important;
   }
 }
+
+/* Device-first settings and a small, dismissible first-visit tour. */
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.settings-trigger {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  background: #fff;
+  flex-shrink: 0;
+}
+.budget-settings h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 9px;
+}
+.budget-settings p {
+  font-size: 12px;
+  line-height: 1.75;
+  color: #7b8970;
+  margin: 0 0 16px;
+  overflow-wrap: anywhere;
+}
+.settings-device {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #e3eadb;
+  background: #f4f7ef;
+  border-radius: 9px;
+}
+.settings-device > svg {
+  flex-shrink: 0;
+  color: #6d8758;
+  margin-top: 2px;
+}
+.settings-device p {
+  margin: 0;
+  font-size: 11px;
+}
+.settings-section {
+  border-bottom: 1px solid var(--line);
+  padding: 23px 0;
+}
+.settings-section-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+.settings-section-title > div {
+  min-width: 0;
+}
+.settings-section-title h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.settings-section-title .switch {
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.settings-section p.settings-hint {
+  font-size: 11px;
+  margin-bottom: 12px;
+}
+.settings-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.settings-actions .btn {
+  flex: 1;
+  font-size: 11px;
+  min-height: 44px;
+}
+.settings-link {
+  display: block;
+  min-height: 44px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-size: 11px;
+  color: #708264;
+  text-align: left;
+  margin-top: 8px;
+}
+.settings-replay {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 12px;
+  font-size: 12px;
+  text-align: left;
+}
+.settings-replay svg:last-child {
+  margin-left: auto;
+}
+.settings-error,
+.budget-settings p.settings-error {
+  padding: 12px;
+  background: #fff4ee;
+  border: 1px solid #ecd9cd;
+  border-radius: 7px;
+  color: #966c54;
+}
+.settings-success,
+.budget-settings p.settings-success {
+  padding: 12px;
+  background: #eff6e9;
+  border: 1px solid #dde9d3;
+  border-radius: 7px;
+  color: #60804b;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.settings-success svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.settings-illustration {
+  width: 52px;
+  height: 52px;
+  border: 1px solid #e3eadb;
+  background: #f4f7ef;
+  border-radius: 12px;
+  color: #6d8758;
+  display: grid;
+  place-items: center;
+  margin-bottom: 18px;
+}
+.settings-wide {
+  width: 100%;
+  white-space: normal;
+  min-height: 44px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+[data-tour-active] {
+  outline: 2px solid #7f9f66;
+  outline-offset: 5px;
+  scroll-margin-top: 24px;
+}
+.tour-tooltip {
+  position: fixed;
+  z-index: 60;
+  width: min(310px, calc(100vw - 24px));
+  padding: 20px;
+  background: #fffef9;
+  border: 1px solid #d8e3cc;
+  border-radius: 12px;
+  box-shadow: 0 8px 40px #2c452930;
+}
+.tour-tooltip:focus {
+  outline: none;
+}
+.tour-kicker {
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: #81926f;
+  display: flex;
+  justify-content: space-between;
+  padding-right: 25px;
+}
+.tour-kicker span {
+  letter-spacing: 0;
+}
+.tour-tooltip h2 {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: -0.5px;
+  margin: 14px 0 9px;
+}
+.tour-tooltip p {
+  font-size: 12px;
+  line-height: 1.75;
+  color: #7b8970;
+  margin: 0 0 15px;
+}
+.tour-close {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 32px;
+  height: 32px;
+}
+.tour-footer,
+.tour-footer > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.tour-footer button {
+  font-size: 11px;
+  min-height: 36px;
+}
+.tour-footer > button {
+  color: #8e9982;
+  padding: 0;
+}
+@media (max-width: 640px) {
+  .topbar {
+    flex-wrap: nowrap;
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+  .topbar-actions {
+    gap: 8px;
+  }
+  .save-state {
+    font-size: 10px;
+  }
+  .breadcrumb {
+    font-size: 10px;
+  }
+  .breadcrumb span {
+    padding: 0 6px;
+  }
+  .settings-trigger {
+    width: 44px;
+  }
+  .budget-settings h3 {
+    font-size: 15px;
+  }
+  .budget-settings p,
+  .settings-device p {
+    font-size: 12px;
+  }
+  .settings-actions .btn {
+    font-size: 12px;
+  }
+  .settings-replay,
+  .settings-link {
+    font-size: 12px;
+  }
+  .settings-section-title .switch {
+    margin-top: -8px;
+  }
+  .tour-tooltip {
+    padding: 17px;
+  }
+  .tour-kicker {
+    font-size: 9px;
+  }
+  .tour-close {
+    width: 44px;
+    height: 44px;
+    right: 2px;
+    top: 0;
+  }
+  .tour-footer button {
+    min-height: 44px;
+    font-size: 12px;
+  }
+}
+
+.settings-code {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.settings-code summary {
+  cursor: pointer;
+  min-height: 44px;
+  font-size: 12px;
+  color: #728465;
+}
+.recovery-backup {
+  max-width: 340px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.recovery-backup input {
+  display: block;
+  margin-top: 12px;
+  width: 100%;
+}

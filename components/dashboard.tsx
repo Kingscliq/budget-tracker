@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -24,6 +24,7 @@ import {
   CheckCircle2,
   Leaf,
   Download,
+  Settings,
 } from "lucide-react";
 import * as Switch from "@radix-ui/react-switch";
 import {
@@ -54,7 +55,15 @@ import {
   type Expense,
   type ExpenseInput,
 } from "@/lib/budget";
-import * as actions from "@/app/actions";
+import {
+  loadCloud,
+  saveCloud,
+  disconnectSync,
+  type CloudBudget,
+} from "@/lib/cloud-client";
+import { validateBudgets, parseBackup, MAX_BACKUP_BYTES } from "@/lib/backup";
+import { BudgetSettings } from "./budget-settings";
+import { OnboardingTour } from "./onboarding-tour";
 const STORAGE = "pocket-budget-v1";
 const COLORS = [
   "#346655",
@@ -69,20 +78,23 @@ const dateToday = () => new Date().toLocaleDateString("en-CA");
 const monthName = (m: number) =>
   new Date(2026, m - 1, 1).toLocaleString("en", { month: "long" });
 export default function Dashboard({
-  initial,
-  connected,
-  initialError,
+  syncAvailable,
 }: {
-  initial: Budget[];
-  connected: boolean;
-  initialError: string;
+  syncAvailable: boolean;
 }) {
-  const [budgets, setBudgets] = useState<Budget[]>(initial),
+  const [budgets, setBudgets] = useState<Budget[]>([]),
     [selected, setSelected] = useState(""),
     [ready, setReady] = useState(false),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState(initialError),
+    [error, setError] = useState(""),
     [notice, setNotice] = useState("");
+  const [connected, setConnected] = useState(false),
+    [syncEmail, setSyncEmail] = useState(""),
+    [settingsOpen, setSettingsOpen] = useState(false),
+    [tourOpen, setTourOpen] = useState(false);
+  const revision = useRef<number | null>(null);
+  const operation = useRef(false);
+  const firstInit = useRef(false);
   const [view, setView] = useState("Overview"),
     [search, setSearch] = useState(""),
     [filter, setFilter] = useState("All items");
@@ -97,69 +109,74 @@ export default function Dashboard({
     [date, setDate] = useState(dateToday),
     [formError, setFormError] = useState("");
   useEffect(() => {
-    let cancelled = false;
-    async function init() {
+    if (firstInit.current) return;
+    firstInit.current = true;
+    startTransition(async () => {
       try {
-        let list = initial;
-        const now = new Date();
-        if (connected) {
-          if (!list.length && !initialError)
-            list = await actions.createMonth(
-              now.getMonth() + 1,
-              now.getFullYear(),
-              true,
+        const saved = localStorage.getItem(STORAGE),
+          now = new Date();
+        let list = saved
+          ? validateBudgets(JSON.parse(saved))
+          : [newBudget(now.getMonth() + 1, now.getFullYear(), true)];
+        localStorage.setItem(STORAGE, JSON.stringify(list));
+        if (localStorage.getItem("pocket-sync-enabled") === "true") {
+          if (localStorage.getItem("pocket-sync-pending") === "true") {
+            localStorage.removeItem("pocket-sync-enabled");
+            setError(
+              "Unsynced changes are safe on this device. Open Settings to resume sync.",
             );
-        } else {
-          const saved = localStorage.getItem(STORAGE);
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            if (
-              !Array.isArray(parsed) ||
-              !parsed.every(
-                (b: Budget) =>
-                  Array.isArray(b.expenses) && Number.isSafeInteger(b.salary),
-              )
-            )
-              throw new Error("Saved demo data could not be read.");
-            list = parsed;
+          } else {
+            try {
+              const cloud = await loadCloud();
+              if (cloud?.budgets) {
+                list = cloud.budgets;
+                localStorage.setItem(STORAGE, JSON.stringify(list));
+                revision.current = cloud.revision;
+                setConnected(true);
+                setSyncEmail(cloud.email);
+              } else {
+                localStorage.removeItem("pocket-sync-enabled");
+                setError("Open Settings to verify your email and resume sync.");
+              }
+            } catch {
+              localStorage.removeItem("pocket-sync-enabled");
+              setError(
+                "Cloud sync is unavailable. Your device copy is ready to use.",
+              );
+            }
           }
-          if (!list.length)
-            list = [newBudget(now.getMonth() + 1, now.getFullYear(), true)];
         }
-        if (cancelled) return;
         setBudgets(list);
         setSelected(
           list.find(
             (b) =>
               b.month === now.getMonth() + 1 && b.year === now.getFullYear(),
-          )?.id ??
-            list.at(-1)?.id ??
-            "",
+          )?.id ?? list.at(-1)!.id,
         );
-      } catch (e) {
-        if (!cancelled)
-          setError(
-            e instanceof Error ? e.message : "Could not load your budget.",
+        setTourOpen(localStorage.getItem("pocket-tour-v1") !== "done");
+        const callback = new URLSearchParams(location.search).get("sync");
+        if (callback === "verified") {
+          setSettingsOpen(true);
+          setNotice(
+            "Email verified. Turn on sync in Settings to choose your budget.",
           );
-      } finally {
-        if (!cancelled) setReady(true);
-      }
-    }
-    void init();
-    return () => {
-      cancelled = true;
-    };
-  }, [connected, initial, initialError]);
-  useEffect(() => {
-    if (ready && !connected && budgets.length)
-      try {
-        localStorage.setItem(STORAGE, JSON.stringify(budgets));
+        }
+        if (callback === "error") {
+          setError(
+            "That sign-in link expired or was opened in another browser. Request a new email from Settings and open it in the same browser.",
+          );
+          setSettingsOpen(true);
+        }
+        if (callback) history.replaceState({}, "", location.pathname);
       } catch {
         setError(
-          "Browser storage is full or unavailable. Changes cannot be saved.",
+          "Could not read or save this device’s budget. Check browser storage or restore a backup from Settings.",
         );
+      } finally {
+        setReady(true);
       }
-  }, [budgets, connected, ready]);
+    });
+  }, []);
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(""), 3500);
@@ -167,31 +184,103 @@ export default function Dashboard({
   }, [notice]);
   const budget = budgets.find((b) => b.id === selected);
   const summary = budget ? totals(budget) : null;
-  async function mutate(
-    local: (items: Budget[]) => Budget[],
-    remote: () => Promise<unknown>,
-    message: string,
-  ) {
-    if (busy) return false;
-    const before = budgets;
+  async function persist(next: Budget[]) {
+    const clean = validateBudgets(next);
+    // Mark before saving locally so a closed tab cannot silently lose an unsynced edit.
+    if (connected) localStorage.setItem("pocket-sync-pending", "true");
+    localStorage.setItem(STORAGE, JSON.stringify(clean));
+    setBudgets(clean);
+    if (connected) {
+      try {
+        revision.current = await saveCloud(clean, revision.current);
+        localStorage.removeItem("pocket-sync-pending");
+      } catch (e) {
+        localStorage.removeItem("pocket-sync-enabled");
+        setConnected(false);
+        setError(
+          e instanceof Error
+            ? e.message
+            : "Sync paused. Your changes are saved on this device.",
+        );
+      }
+    }
+  }
+  async function mutate(local: (items: Budget[]) => Budget[], message: string) {
+    if (operation.current) return false;
+    operation.current = true;
     setBusy(true);
     setError("");
-    setBudgets(local(before));
     try {
-      if (connected) {
-        await remote();
-        setBudgets(await actions.loadBudgets());
-      }
+      await persist(local(budgets));
       setNotice(message);
       return true;
-    } catch (e) {
-      setBudgets(before);
+    } catch {
       setError(
-        e instanceof Error ? e.message : "Could not save. Please try again.",
+        "Could not save on this device. Check browser storage before continuing.",
       );
       return false;
     } finally {
+      operation.current = false;
       setBusy(false);
+    }
+  }
+  async function useCloud(cloud: CloudBudget) {
+    if (!cloud.budgets) throw new Error("No saved cloud budget was found.");
+    localStorage.setItem(
+      "pocket-previous-device-copy",
+      JSON.stringify(budgets),
+    );
+    localStorage.setItem(STORAGE, JSON.stringify(cloud.budgets));
+    localStorage.setItem("pocket-sync-enabled", "true");
+    localStorage.removeItem("pocket-sync-pending");
+    revision.current = cloud.revision;
+    setBudgets(cloud.budgets);
+    setSelected(cloud.budgets[0].id);
+    setConnected(true);
+    setSyncEmail(cloud.email);
+    setError("");
+    setNotice("Your saved budget is ready on this device");
+  }
+  async function uploadDevice(cloud: CloudBudget) {
+    const nextRevision = await saveCloud(budgets, cloud.revision);
+    localStorage.setItem("pocket-sync-enabled", "true");
+    localStorage.removeItem("pocket-sync-pending");
+    revision.current = nextRevision;
+    setConnected(true);
+    setSyncEmail(cloud.email);
+    setError("");
+    setNotice("Sync is on. This device’s budget is now saved to your account.");
+  }
+  async function stopSync() {
+    localStorage.removeItem("pocket-sync-enabled");
+    localStorage.removeItem("pocket-sync-pending");
+    setConnected(false);
+    setSyncEmail("");
+    revision.current = null;
+    try {
+      await disconnectSync();
+    } catch {
+      setError(
+        "Sync is off on this device. Reconnect when online to finish signing out.",
+      );
+    }
+    setNotice("Sync is off. Your budget stays on this device.");
+  }
+  async function restoreBackup(value: Budget[]) {
+    localStorage.setItem(
+      "pocket-previous-device-copy",
+      JSON.stringify(budgets),
+    );
+    const ok = await mutate(() => value, "Backup restored");
+    if (!ok) throw new Error("Could not restore this backup.");
+    setSelected(value[0].id);
+  }
+  function finishTour() {
+    setTourOpen(false);
+    try {
+      localStorage.setItem("pocket-tour-v1", "done");
+    } catch {
+      /* tour dismissal still works for this visit */
     }
   }
   const changeExpense =
@@ -212,23 +301,11 @@ export default function Dashboard({
       setSelected(existing.id);
       return;
     }
-    setBusy(true);
-    try {
-      if (connected) {
-        const all = await actions.createMonth(m, y);
-        setBudgets(all);
-        setSelected(all.find((b) => b.month === m && b.year === y)!.id);
-      } else {
-        const next = newBudget(m, y);
-        setBudgets([...budgets, next]);
-        setSelected(next.id);
-      }
-    } catch {
-      setError("Could not open this month. Please try again.");
-    } finally {
-      setBusy(false);
-    }
+    const next = newBudget(m, y);
+    if (await mutate((items) => [...items, next], "Month opened"))
+      setSelected(next.id);
   }
+
   function openExpense(e?: Expense) {
     setEditing(e ?? null);
     setName(e?.name ?? "");
@@ -259,7 +336,6 @@ export default function Dashboard({
         ok = await mutate(
           (items) =>
             items.map((b) => (b.id === selected ? { ...b, salary: kobo } : b)),
-          () => actions.setSalary(selected, kobo),
           "Monthly income updated",
         );
       if (modal === "expense") {
@@ -294,7 +370,6 @@ export default function Dashboard({
                   }
                 : b,
             ),
-          () => actions.saveExpense(selected, editing?.id ?? null, input),
           editing ? "Expense updated" : "Expense added",
         );
       }
@@ -314,7 +389,6 @@ export default function Dashboard({
               },
             ],
           })),
-          () => actions.recordPayment(editing.id, kobo, date),
           "Payment recorded",
         );
       }
@@ -359,7 +433,6 @@ export default function Dashboard({
               }
             : b,
         ),
-      () => actions.copyPrevious(selected),
       "Previous month copied. Payments start at zero.",
     );
   }
@@ -405,6 +478,31 @@ export default function Dashboard({
         <Wallet />
         <h1>Let’s get your budget ready</h1>
         <p role="alert">{error || "No budget available."}</p>
+        <label className="recovery-backup">
+          Restore a Pocket backup
+          <input
+            type="file"
+            accept=".json,application/json"
+            aria-label="Restore a Pocket backup"
+            onChange={async (event) => {
+              try {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                if (file.size > MAX_BACKUP_BYTES)
+                  throw new Error("Choose a backup smaller than 750 KB.");
+                const list = parseBackup(await file.text());
+                localStorage.setItem(STORAGE, JSON.stringify(list));
+                setBudgets(list);
+                setSelected(list[0].id);
+                setError("");
+              } catch (e) {
+                setError(
+                  e instanceof Error ? e.message : "Could not restore backup.",
+                );
+              }
+            }}
+          />
+        </label>
         <Button onClick={() => location.reload()}>Try again</Button>
       </div>
     );
@@ -521,14 +619,28 @@ export default function Dashboard({
           <div className="breadcrumb">
             Workspace <span>/</span> <strong>{view}</strong>
           </div>
-          <span className={`save-state ${busy ? "saving" : ""}`}>
-            {busy ? <Loader2 size={14} className="spin" /> : <span />}
-            {busy
-              ? "Saving…"
-              : connected
-                ? "Connected to Supabase"
-                : "Demo · saved in this browser"}
-          </span>
+          <div className="topbar-actions">
+            <span className={`save-state ${busy ? "saving" : ""}`}>
+              {busy ? <Loader2 size={14} className="spin" /> : <span />}
+              {busy
+                ? "Saving…"
+                : connected
+                  ? "Synced across devices"
+                  : "Saved on this device"}
+            </span>
+            <button
+              className="settings-trigger icon-button"
+              data-tour="settings"
+              aria-label="Settings"
+              disabled={busy}
+              onClick={() => {
+                finishTour();
+                setSettingsOpen(true);
+              }}
+            >
+              <Settings size={18} />
+            </button>
+          </div>
         </header>
         <div className="page-content">
           <section className="page-heading">
@@ -583,7 +695,7 @@ export default function Dashboard({
               </button>
             </div>
           )}
-          <section className="income-bar">
+          <section className="income-bar" data-tour="income">
             <div className="income-label">
               <span className="mini-icon">
                 <Wallet size={19} />
@@ -604,7 +716,6 @@ export default function Dashboard({
                         items.map((b) =>
                           b.id === selected ? { ...b, salary: n * 100 } : b,
                         ),
-                      () => actions.setSalary(selected, n * 100),
                       "Salary scenario updated",
                     )
                   }
@@ -747,7 +858,6 @@ export default function Dashboard({
                                     (v) => v.id !== p.id,
                                   ),
                                 })),
-                                () => actions.removePayment(p.id),
                                 "Payment removed",
                               )
                             }
@@ -789,7 +899,11 @@ export default function Dashboard({
                           : "A place for every naira. Adjust as life happens."}
                       </p>
                     </div>
-                    <Button disabled={busy} onClick={() => openExpense()}>
+                    <Button
+                      data-tour="expenses"
+                      disabled={busy}
+                      onClick={() => openExpense()}
+                    >
                       <Plus size={16} /> Add expense
                     </Button>
                   </div>
@@ -907,7 +1021,6 @@ export default function Dashboard({
                                       ...x,
                                       is_active: active,
                                     })),
-                                    () => actions.toggleExpense(e.id, active),
                                     active
                                       ? "Expense restored"
                                       : "Unpaid allocation freed up",
@@ -976,7 +1089,9 @@ export default function Dashboard({
                   <div className="table-footer">
                     <span>
                       <span className="tiny-dot" /> Changes{" "}
-                      {connected ? "sync to Supabase" : "save in this browser"}
+                      {connected
+                        ? "sync across devices"
+                        : "save on this device"}
                     </span>
                     <button
                       disabled={busy || budget.expenses.length > 0}
@@ -1086,7 +1201,7 @@ export default function Dashboard({
                   </strong>
                 </div>
               </section>
-              <section className="panel allocation-panel">
+              <section className="panel allocation-panel" data-tour="savings">
                 <div className="panel-heading">
                   <div>
                     <h2>Future you says thanks.</h2>
@@ -1255,6 +1370,25 @@ export default function Dashboard({
           </footer>
         </div>
       </main>
+      <BudgetSettings
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        budgets={budgets}
+        syncAvailable={syncAvailable}
+        connected={connected}
+        email={syncEmail}
+        disabled={busy}
+        onUseCloud={useCloud}
+        onUpload={uploadDevice}
+        onDisconnect={stopSync}
+        onRestore={restoreBackup}
+        onReplay={() => {
+          setSettingsOpen(false);
+          setView("Overview");
+          setTourOpen(true);
+        }}
+      />
+      {tourOpen && !settingsOpen && <OnboardingTour onFinish={finishTour} />}
       {notice && (
         <div className="toast" role="status">
           <CheckCircle2 size={17} />
@@ -1414,7 +1548,6 @@ export default function Dashboard({
                           }
                         : b,
                     ),
-                  () => actions.deleteExpense(editing.id),
                   "Expense deleted",
                 );
                 if (ok) setModal(null);
@@ -1447,7 +1580,6 @@ export default function Dashboard({
                           ...e,
                           payments: e.payments.filter((x) => x.id !== p.id),
                         })),
-                        () => actions.removePayment(p.id),
                         "Payment removed",
                       )
                     }
