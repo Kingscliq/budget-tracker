@@ -7,6 +7,7 @@ import {
   storeSession,
   syncConfigured,
 } from "@/lib/supabase";
+import { appOrigin } from "@/lib/app-origin";
 import { validateBudgets } from "@/lib/backup";
 import type { Budget } from "@/lib/budget";
 export type CloudBudget = {
@@ -37,7 +38,7 @@ async function requestSyncCodeImpl(email: string) {
     email: email.trim().toLowerCase(),
     options: {
       shouldCreateUser: true,
-      emailRedirectTo: `${(process.env.APP_URL || "http://127.0.0.1:3000").replace(/\/$/, "")}/auth/confirm`,
+      emailRedirectTo: `${appOrigin({ APP_URL: process.env.APP_URL, VERCEL_ENV: process.env.VERCEL_ENV, VERCEL_PROJECT_PRODUCTION_URL: process.env.VERCEL_PROJECT_PRODUCTION_URL, VERCEL_URL: process.env.VERCEL_URL })}/auth/confirm`,
     },
   });
   if (error)
