@@ -45,7 +45,13 @@ export function OnboardingTour({ onFinish }: { onFinish: () => void }) {
     );
     if (!target) return;
     target.setAttribute("data-tour-active", "true");
-    target.scrollIntoView({ block: "center", behavior: "instant" });
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    target.scrollIntoView({
+      block: "center",
+      behavior: reducedMotion ? "instant" : "smooth",
+    });
     const place = () => {
       if (!card.current) return;
       const r = target.getBoundingClientRect(),
@@ -55,20 +61,33 @@ export function OnboardingTour({ onFinish }: { onFinish: () => void }) {
       let top = r.bottom + 12;
       if (top + height > availableBottom) top = r.top - height - 12;
       top = Math.max(12, Math.min(top, availableBottom - height));
-      setPosition({
-        top,
-        left: Math.max(12, Math.min(r.left, innerWidth - width - 12)),
-      });
+      const left = Math.max(12, Math.min(r.left, innerWidth - width - 12));
+      setPosition((previous) =>
+        previous.top === top && previous.left === left
+          ? previous
+          : { top, left },
+      );
       setPlaced(true);
     };
     place();
     card.current?.focus({ preventScroll: true });
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, { passive: true });
+    // Keep the same card mounted while the target scrolls into view.
+    let frame = 0;
+    const schedulePlace = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(place);
+    };
+    const observer = new ResizeObserver(schedulePlace);
+    observer.observe(target);
+    if (card.current) observer.observe(card.current);
+    window.addEventListener("resize", schedulePlace);
+    window.addEventListener("scroll", schedulePlace, { passive: true });
     return () => {
       target.removeAttribute("data-tour-active");
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place);
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("resize", schedulePlace);
+      window.removeEventListener("scroll", schedulePlace);
     };
   }, [current]);
   return (
@@ -79,7 +98,10 @@ export function OnboardingTour({ onFinish }: { onFinish: () => void }) {
       aria-labelledby="tour-title"
       aria-describedby="tour-description"
       tabIndex={-1}
-      style={{ ...position, visibility: placed ? "visible" : "hidden" }}
+      style={{
+        transform: `translate3d(${position.left}px, ${position.top}px, 0)`,
+        visibility: placed ? "visible" : "hidden",
+      }}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.stopPropagation();
