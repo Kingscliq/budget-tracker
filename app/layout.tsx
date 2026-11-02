@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { Analytics } from "@/components/analytics";
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -15,9 +16,15 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const gaId = process.env.GA_MEASUREMENT_ID?.trim();
+  const analyticsEnabled =
+    process.env.VERCEL_ENV === "production" && /^G-[A-Z0-9]+$/.test(gaId ?? "");
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        {analyticsEnabled && <Analytics measurementId={gaId!} />}
+      </body>
     </html>
   );
 }

@@ -63,6 +63,7 @@ import {
 import { validateBudgets, parseBackup, MAX_BACKUP_BYTES } from "@/lib/backup";
 import { BudgetSettings } from "./budget-settings";
 import { OnboardingTour } from "./onboarding-tour";
+import { trackEvent } from "@/lib/analytics";
 const STORAGE = "pocket-budget-v1";
 const COLORS = [
   "#346655",
@@ -238,6 +239,7 @@ export default function Dashboard({
     setConnected(true);
     setSyncEmail(cloud.email);
     setError("");
+    trackEvent("sync_enabled");
     setNotice("Your saved budget is ready on this device");
   }
   async function uploadDevice(cloud: CloudBudget) {
@@ -248,6 +250,7 @@ export default function Dashboard({
     setConnected(true);
     setSyncEmail(cloud.email);
     setError("");
+    trackEvent("sync_enabled");
     setNotice("Sync is on. This device’s budget is now saved to your account.");
   }
   async function stopSync() {
@@ -263,6 +266,7 @@ export default function Dashboard({
         "Sync is off on this device. Reconnect when online to finish signing out.",
       );
     }
+    trackEvent("sync_disabled");
     setNotice("Sync is off. Your budget stays on this device.");
   }
   async function restoreBackup(value: Budget[]) {
@@ -273,6 +277,7 @@ export default function Dashboard({
     const ok = await mutate(() => value, "Backup restored");
     if (!ok) throw new Error("Could not restore this backup.");
     setSelected(value[0].id);
+    trackEvent("backup_restored");
   }
   function finishTour() {
     setTourOpen(false);
@@ -301,8 +306,10 @@ export default function Dashboard({
       return;
     }
     const next = newBudget(m, y);
-    if (await mutate((items) => [...items, next], "Month opened"))
+    if (await mutate((items) => [...items, next], "Month opened")) {
       setSelected(next.id);
+      trackEvent("month_created");
+    }
   }
 
   function openExpense(e?: Expense) {
@@ -391,7 +398,13 @@ export default function Dashboard({
           "Payment recorded",
         );
       }
-      if (ok) setModal(null);
+      if (ok) {
+        if (modal === "salary") trackEvent("income_updated");
+        if (modal === "payment") trackEvent("payment_recorded");
+        if (modal === "expense")
+          trackEvent(editing ? "expense_updated" : "expense_created");
+        setModal(null);
+      }
     } catch (e) {
       setFormError(
         e instanceof Error ? e.message : "Please check your inputs.",
@@ -414,7 +427,7 @@ export default function Dashboard({
       );
       return;
     }
-    await mutate(
+    const copied = await mutate(
       (items) =>
         items.map((b) =>
           b.id === selected
@@ -434,6 +447,7 @@ export default function Dashboard({
         ),
       "Previous month copied. Payments start at zero.",
     );
+    if (copied) trackEvent("month_copied");
   }
   function exportCSV() {
     if (!budget) return;
@@ -464,6 +478,7 @@ export default function Dashboard({
     a.download = `pocket-${budget.year}-${budget.month}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    trackEvent("csv_exported");
   }
   if (!ready)
     return (
@@ -567,6 +582,12 @@ export default function Dashboard({
                 key={String(label)}
                 className={`nav-item ${view === label ? "active" : ""}`}
                 onClick={() => {
+                  if (view !== label) {
+                    if (label === "Overview") trackEvent("view_overview");
+                    if (label === "Savings") trackEvent("view_savings");
+                    if (label === "Transactions")
+                      trackEvent("view_transactions");
+                  }
                   setView(String(label));
                   setFilter("All items");
                   setSearch("");
@@ -619,6 +640,7 @@ export default function Dashboard({
               disabled={busy}
               onClick={() => {
                 finishTour();
+                trackEvent("settings_opened");
                 setSettingsOpen(true);
               }}
             >

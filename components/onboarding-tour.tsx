@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { X, ArrowRight, Check } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 const steps = [
   {
     target: "income",
@@ -30,6 +31,10 @@ export function OnboardingTour({ onFinish }: { onFinish: () => void }) {
   const card = useRef<HTMLDivElement>(null);
   const originalFocus = useRef<HTMLElement | null>(null);
   const current = steps[step];
+  function finish(completed = false) {
+    trackEvent(completed ? "tour_completed" : "tour_skipped");
+    onFinish();
+  }
   useEffect(() => {
     originalFocus.current = document.activeElement as HTMLElement;
     return () => originalFocus.current?.focus({ preventScroll: true });
@@ -78,7 +83,7 @@ export function OnboardingTour({ onFinish }: { onFinish: () => void }) {
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.stopPropagation();
-          onFinish();
+          finish();
         }
       }}
     >
@@ -91,20 +96,20 @@ export function OnboardingTour({ onFinish }: { onFinish: () => void }) {
       <button
         className="icon-button tour-close"
         aria-label="Skip tour"
-        onClick={onFinish}
+        onClick={() => finish()}
       >
         <X size={16} />
       </button>
       <h2 id="tour-title">{current.title}</h2>
       <p id="tour-description">{current.text}</p>
       <div className="tour-footer">
-        <button onClick={onFinish}>Skip tour</button>
+        <button onClick={() => finish()}>Skip tour</button>
         <div>
           {step > 0 && <button onClick={() => setStep(step - 1)}>Back</button>}
           <button
             className="btn btn-primary"
             onClick={() =>
-              step === steps.length - 1 ? onFinish() : setStep(step + 1)
+              step === steps.length - 1 ? finish(true) : setStep(step + 1)
             }
           >
             {step === steps.length - 1 ? "Got it" : "Next"}

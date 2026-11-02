@@ -72,3 +72,11 @@ Deploy to a Next.js-compatible host. Local-only mode needs no Supabase configura
 ## Savings in the main budget
 
 Overview includes every allocation, including Savings and existing optional Forex items. The displayed planned/actual expense totals and payment charts include savings contributions. Savings has a separate detail view and progress card, showing only the Savings category as a breakdown of the total. Savings is never subtracted twice: budget remaining is income minus all planned allocations, and cash remaining is income minus all recorded payments. Internal consumption-only totals remain available separately.
+
+## Product analytics
+
+Optional GA4 tracks visits and fixed product actions without requiring a Pocket account. Set `GA_MEASUREMENT_ID` to your web stream’s `G-…` ID in Vercel Production and redeploy. Analytics loads only when `VERCEL_ENV=production`; local and preview traffic is excluded. Disable enhanced measurement in the GA4 web stream: Pocket sends explicit events instead of automatically capturing forms, search text, or links.
+
+Events include `expense_created`, `expense_updated`, `payment_recorded`, `income_updated`, `month_created`, `month_copied`, `csv_exported`, `backup_downloaded`, `backup_restored`, `sync_requested`, `sync_enabled`, `sync_disabled`, `settings_opened`, `view_overview`, `view_savings`, `view_transactions`, `tour_completed`, and `tour_skipped`. Save events fire after successful local persistence. No amounts, expense names, categories, dates, budget IDs, emails, or auth tokens are attached. Page URLs are reduced to the app origin and referrers to their origin. Google Signals and ad personalization are disabled. No session replay is installed.
+
+Users can disable analytics for their browser in Settings → Usage analytics. Changing the preference reloads Pocket; disabled browsers do not load the Google tag. GA4 uses browser cookies, so visitors are browser-based estimates rather than identified people across devices. Ad blockers may prevent measurement. Use GA4 Realtime to verify incoming activity and Reports → Engagement → Events for feature usage after processing.

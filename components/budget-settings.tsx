@@ -27,6 +27,7 @@ import {
   type CloudBudget,
 } from "@/lib/cloud-client";
 import type { Budget } from "@/lib/budget";
+import { trackEvent } from "@/lib/analytics";
 type Props = {
   open: boolean;
   onOpenChange: (value: boolean) => void;
@@ -49,6 +50,7 @@ export function downloadBackup(budgets: Budget[], name = "pocket-backup") {
   a.href = url;
   a.download = `${name}-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
+  trackEvent("backup_downloaded");
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 export function BudgetSettings(props: Props) {
@@ -69,6 +71,7 @@ export function BudgetSettings(props: Props) {
   const [stage, setStage] = useState<
       "settings" | "email" | "code" | "choose" | "replace" | "restore"
     >("settings"),
+    [analyticsAllowed, setAnalyticsAllowed] = useState(true),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
@@ -85,6 +88,7 @@ export function BudgetSettings(props: Props) {
       setMessage("");
       setCode("");
       try {
+        setAnalyticsAllowed(localStorage.getItem("pocket-analytics") !== "off");
         const saved = localStorage.getItem("pocket-previous-device-copy");
         setPrevious(saved ? validateBudgets(JSON.parse(saved)) : null);
       } catch {
@@ -277,6 +281,43 @@ export function BudgetSettings(props: Props) {
                 }}
               />
             </section>
+            <section className="settings-section">
+              <div className="settings-section-title">
+                <div>
+                  <h3>Usage analytics</h3>
+                  <p>
+                    Help improve Pocket with Google Analytics visit and feature
+                    usage statistics. We never send your budget amounts, expense
+                    names, or email. Google uses browser cookies to measure
+                    visits.
+                  </p>
+                </div>
+                <Switch.Root
+                  className="switch"
+                  aria-label="Usage analytics"
+                  checked={analyticsAllowed}
+                  onCheckedChange={(allowed) => {
+                    try {
+                      localStorage.setItem(
+                        "pocket-analytics",
+                        allowed ? "on" : "off",
+                      );
+                      setAnalyticsAllowed(allowed);
+                      // Reload stops the Google tag and its automatic engagement events.
+                      location.reload();
+                    } catch {
+                      setError("Could not save your analytics preference.");
+                    }
+                  }}
+                >
+                  <Switch.Thumb className="switch-thumb" />
+                </Switch.Root>
+              </div>
+              <p className="settings-hint">
+                This choice applies to this browser. Changing it reloads Pocket;
+                your saved budget stays here.
+              </p>
+            </section>
             <button
               className="settings-replay"
               disabled={busy}
@@ -293,6 +334,7 @@ export function BudgetSettings(props: Props) {
               e.preventDefault();
               run(async () => {
                 await requestSyncCode(address);
+                trackEvent("sync_requested");
                 setStage("code");
               });
             }}
