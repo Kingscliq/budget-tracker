@@ -2434,7 +2434,22 @@ a {
   margin-top: 8px;
   font-size: 12px;
 }
+/* The backdrop stays mounted between steps so the page never flashes. */
+.tour-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgb(24 36 28 / 42%);
+  animation: tour-dim-in 180ms ease-out;
+}
+@keyframes tour-dim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 [data-tour-active] {
+  position: relative;
+  z-index: 51;
+  pointer-events: none;
   outline: 2px solid #7f9f66;
   outline-offset: 5px;
   scroll-margin-top: 24px;
