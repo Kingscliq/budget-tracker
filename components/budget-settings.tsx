@@ -26,12 +26,14 @@ import {
   verifySyncCode,
   type CloudBudget,
 } from "@/lib/cloud-client";
-import type { Budget } from "@/lib/budget";
+import { currencies, type Currency, type Budget } from "@/lib/budget";
 import { trackEvent } from "@/lib/analytics";
 type Props = {
   open: boolean;
   onOpenChange: (value: boolean) => void;
   budgets: Budget[];
+  budget: Budget;
+  onCurrencyChange: (currency: Currency) => Promise<void>;
   syncAvailable: boolean;
   connected: boolean;
   email: string;
@@ -58,6 +60,8 @@ export function BudgetSettings(props: Props) {
     open,
     onOpenChange,
     budgets,
+    budget,
+    onCurrencyChange,
     syncAvailable,
     connected,
     email,
@@ -68,6 +72,9 @@ export function BudgetSettings(props: Props) {
     onRestore,
     onReplay,
   } = props;
+  const [currencyChoice, setCurrencyChoice] = useState<Currency>(
+    budget.currency,
+  );
   const [stage, setStage] = useState<
       "settings" | "email" | "code" | "choose" | "replace" | "restore"
     >("settings"),
@@ -84,6 +91,7 @@ export function BudgetSettings(props: Props) {
   useEffect(() => {
     if (open) {
       setStage("settings");
+      setCurrencyChoice(budget.currency);
       setError("");
       setMessage("");
       setCode("");
@@ -95,7 +103,7 @@ export function BudgetSettings(props: Props) {
         setPrevious(null);
       }
     }
-  }, [open]);
+  }, [open, budget.id, budget.currency]);
   function run(task: () => Promise<void>) {
     if (busy || disabled) return;
     setBusy(true);
@@ -156,6 +164,52 @@ export function BudgetSettings(props: Props) {
                   data removes its saved copy, so keep a backup.
                 </p>
               </div>
+            </section>
+            <section className="settings-section">
+              <h3>Currency for this month</h3>
+              <p>
+                Choose the currency for{" "}
+                {new Date(budget.year, budget.month - 1).toLocaleDateString(
+                  "en",
+                  { month: "long", year: "numeric" },
+                )}
+                . Other months keep their own currency.
+              </p>
+              <label>
+                Budget currency
+                <select
+                  value={currencyChoice}
+                  disabled={busy || disabled}
+                  onChange={(e) =>
+                    setCurrencyChoice(e.target.value as Currency)
+                  }
+                >
+                  {Object.entries(currencies).map(([code, info]) => (
+                    <option key={code} value={code}>
+                      {code} — {info.name} ({info.symbol})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="settings-hint">
+                Amounts stay exactly the same. This only changes the currency
+                label and formatting; no conversion takes place.
+              </p>
+              {currencyChoice !== budget.currency && (
+                <Button
+                  disabled={busy || disabled}
+                  onClick={() =>
+                    run(async () => {
+                      await onCurrencyChange(currencyChoice);
+                      setMessage(
+                        `Currency changed to ${currencyChoice}. Amounts are unchanged.`,
+                      );
+                    })
+                  }
+                >
+                  Use {currencyChoice} for this month
+                </Button>
+              )}
             </section>
             <section className="settings-section">
               <div className="settings-section-title">

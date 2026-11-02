@@ -42,7 +42,7 @@ The former `budgets`, `expenses` and `payments` tables are left untouched and ar
 
 ## Money rules
 
-All values are integer kobo (₦1 = 100 kobo); actual amounts always sum recorded payments.
+All values are integer minor units (100 per unit of each supported currency); actual amounts always sum recorded payments.
 
 - Planned consumption = active allocations (or actual paid if larger), plus retained payments on cancelled items.
 - Pending consumption = unpaid portion of active consumption items.
@@ -80,3 +80,10 @@ Optional GA4 tracks visits and fixed product actions without requiring a Pocket 
 Events include `expense_created`, `expense_updated`, `payment_recorded`, `income_updated`, `month_created`, `month_copied`, `csv_exported`, `backup_downloaded`, `backup_restored`, `sync_requested`, `sync_enabled`, `sync_disabled`, `settings_opened`, `view_overview`, `view_savings`, `view_transactions`, `tour_completed`, and `tour_skipped`. Save events fire after successful local persistence. No amounts, expense names, categories, dates, budget IDs, emails, or auth tokens are attached. Page URLs are reduced to the app origin and referrers to their origin. Google Signals and ad personalization are disabled. No session replay is installed.
 
 Users can disable analytics for their browser in Settings → Usage analytics. Changing the preference reloads Pocket; disabled browsers do not load the Google tag. GA4 uses browser cookies, so visitors are browser-based estimates rather than identified people across devices. Ad blockers may prevent measurement. Use GA4 Realtime to verify incoming activity and Reports → Engagement → Events for feature usage after processing.
+
+
+## Monthly currencies
+
+Settings → Currency for this month supports NGN, USD, GBP, EUR, and GHS. Each month stores its own currency; existing records and version 1 backups without a currency load as NGN. Changing currency never converts or rescales income, expenses, or recorded payments. New months inherit the selected month’s currency. Copying a previous month keeps the destination currency and copies the numeric amounts unchanged.
+
+Dashboard amounts, form labels, chart ticks/tooltips, payment history, and CSV headers use the selected month’s currency. Trends include only months in that currency. JSON backups use version 2 to preserve currency and prevent older clients from silently importing foreign-currency amounts as NGN; version 1 backups remain readable. Supabase snapshots preserve currency via the existing JSON schema, so no database migration is required.

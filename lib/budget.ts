@@ -1,3 +1,14 @@
+export const currencies = {
+  NGN: { name: "Nigerian naira", symbol: "₦" },
+  USD: { name: "US dollar", symbol: "$" },
+  GBP: { name: "British pound", symbol: "£" },
+  EUR: { name: "Euro", symbol: "€" },
+  GHS: { name: "Ghanaian cedi", symbol: "GH₵" },
+} as const;
+export type Currency = keyof typeof currencies;
+export function isCurrency(value: unknown): value is Currency {
+  return typeof value === "string" && Object.hasOwn(currencies, value);
+}
 export type Category =
   | "Connectivity"
   | "Subscriptions"
@@ -40,19 +51,40 @@ export type Budget = {
   month: number;
   year: number;
   salary: number;
+  currency: Currency;
   expenses: Expense[];
 };
 export type ExpenseInput = Pick<
   Expense,
   "name" | "category" | "expected_amount" | "is_recurring"
 >;
-export const money = (kobo: number) =>
+export const money = (minorUnits: number, currency: Currency = "NGN") =>
   new Intl.NumberFormat("en-NG", {
     style: "currency",
-    currency: "NGN",
+    currency,
     maximumFractionDigits: 2,
     minimumFractionDigits: 0,
-  }).format(kobo / 100);
+  }).format(minorUnits / 100);
+export const compactMoney = (minorUnits: number, currency: Currency) =>
+  new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency,
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(minorUnits / 100);
+
+/** Only compare months denominated in the selected currency. No conversion. */
+export function trendBudgets(budgets: Budget[], selected: Budget) {
+  return budgets
+    .filter(
+      (b) =>
+        (b.currency ?? "NGN") === selected.currency &&
+        (b.year < selected.year ||
+          (b.year === selected.year && b.month <= selected.month)),
+    )
+    .sort((a, b) => a.year - b.year || a.month - b.month)
+    .slice(-6);
+}
 export const actual = (e: Expense) =>
   e.payments.reduce((sum, p) => sum + p.amount, 0);
 export const allocation = (e: Expense) =>
@@ -127,6 +159,7 @@ export function newBudget(
   month: number,
   year: number,
   defaults = false,
+  currency: Currency = "NGN",
 ): Budget {
   const id = crypto.randomUUID();
   return {
@@ -134,6 +167,7 @@ export function newBudget(
     month,
     year,
     salary: 60000000,
+    currency,
     expenses: defaults
       ? seed.map(([name, category, amount]) => ({
           id: crypto.randomUUID(),
@@ -150,7 +184,9 @@ export function newBudget(
 }
 export function validateAmount(n: number, zero = false) {
   if (!Number.isSafeInteger(n) || n < (zero ? 0 : 1) || n > 100000000000)
-    throw new Error("Enter a valid amount up to ₦1 billion.");
+    throw new Error(
+      "Enter a valid amount up to 1 billion in the selected currency.",
+    );
 }
 export function validateExpense(e: ExpenseInput) {
   if (

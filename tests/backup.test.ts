@@ -26,7 +26,7 @@ test("reject unrelated files, unsupported versions and empty or oversized backup
   for (const text of [
     "{}",
     "null",
-    '{"format":"pocket-budget","version":2,"budgets":[]}',
+    '{"format":"pocket-budget","version":3,"budgets":[]}',
     '{"format":"pocket-budget","version":1,"budgets":[]}',
     " ".repeat(MAX_BACKUP_BYTES + 1),
   ])

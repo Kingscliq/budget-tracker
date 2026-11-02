@@ -1,5 +1,6 @@
 import {
   categories,
+  isCurrency,
   validateAmount,
   validateExpense,
   validateMonth,
@@ -27,6 +28,8 @@ export function validateBudgets(value: unknown): Budget[] {
     if (!b || typeof b !== "object") throw new Error("Invalid budget.");
     id(b.id);
     validateMonth(b.month, b.year);
+    if (b.currency !== undefined && !isCurrency(b.currency))
+      throw new Error("Choose a supported budget currency.");
     validateAmount(b.salary, true);
     const month = `${b.year}-${b.month}`;
     if (months.has(month)) throw new Error("The backup has duplicate months.");
@@ -67,6 +70,7 @@ export function validateBudgets(value: unknown): Budget[] {
     month: b.month,
     year: b.year,
     salary: b.salary,
+    currency: b.currency ?? "NGN",
     expenses: b.expenses.map((e: Budget["expenses"][number]) => ({
       id: e.id,
       budget_id: b.id,
@@ -88,14 +92,14 @@ export function parseBackup(text: string): Budget[] {
   if (text.length > MAX_BACKUP_BYTES)
     throw new Error("Choose a backup smaller than 750 KB.");
   const data = JSON.parse(text);
-  if (data?.format !== "pocket-budget" || data?.version !== 1)
+  if (data?.format !== "pocket-budget" || ![1, 2].includes(data?.version))
     throw new Error("This is not a supported Pocket backup.");
   return validateBudgets(data.budgets);
 }
 export function makeBackup(budgets: Budget[]) {
   return JSON.stringify({
     format: "pocket-budget",
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     budgets: validateBudgets(budgets),
   });

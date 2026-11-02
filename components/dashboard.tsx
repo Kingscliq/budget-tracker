@@ -43,7 +43,11 @@ import { Dialog } from "./ui/dialog";
 import {
   actual,
   categories,
-  money,
+  money as formatMoney,
+  compactMoney,
+  currencies,
+  trendBudgets,
+  type Currency,
   newBudget,
   planned,
   status,
@@ -184,6 +188,8 @@ export default function Dashboard({
   }, [notice]);
   const budget = budgets.find((b) => b.id === selected);
   const summary = budget ? totals(budget) : null;
+  const currency = budget?.currency ?? "NGN";
+  const money = (amount: number) => formatMoney(amount, currency);
   async function persist(next: Budget[]) {
     const clean = validateBudgets(next);
     // Mark before saving locally so a closed tab cannot silently lose an unsynced edit.
@@ -305,7 +311,7 @@ export default function Dashboard({
       setSelected(existing.id);
       return;
     }
-    const next = newBudget(m, y);
+    const next = newBudget(m, y, false, currency);
     if (await mutate((items) => [...items, next], "Month opened")) {
       setSelected(next.id);
       trackEvent("month_created");
@@ -445,14 +451,21 @@ export default function Dashboard({
               }
             : b,
         ),
-      "Previous month copied. Payments start at zero.",
+      `Amounts copied unchanged in ${currency}. Payments start at zero.`,
     );
     if (copied) trackEvent("month_copied");
   }
   function exportCSV() {
     if (!budget) return;
     const rows = [
-      ["Name", "Category", "Expected NGN", "Actual NGN", "Status", "Recurring"],
+      [
+        "Name",
+        "Category",
+        `Expected ${currency}`,
+        `Actual ${currency}`,
+        "Status",
+        "Recurring",
+      ],
       ...budget.expenses.map((e) => [
         e.name,
         e.category,
@@ -475,7 +488,7 @@ export default function Dashboard({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `pocket-${budget.year}-${budget.month}.csv`;
+    a.download = `pocket-${budget.year}-${budget.month}-${currency}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     trackEvent("csv_exported");
@@ -545,18 +558,10 @@ export default function Dashboard({
       Actual: summary.totalActual / 100,
     },
   ];
-  const trend = [...budgets]
-    .sort((a, b) => a.year - b.year || a.month - b.month)
-    .filter(
-      (b) =>
-        b.year < budget.year ||
-        (b.year === budget.year && b.month <= budget.month),
-    )
-    .slice(-6)
-    .map((b) => ({
-      name: monthName(b.month).slice(0, 3) + " " + String(b.year).slice(2),
-      Spent: totals(b).totalActual / 100,
-    }));
+  const trend = trendBudgets(budgets, budget).map((b) => ({
+    name: monthName(b.month).slice(0, 3) + " " + String(b.year).slice(2),
+    Spent: totals(b).totalActual / 100,
+  }));
   const historyExpense = budget.expenses.find((e) => e.id === editing?.id);
   return (
     <div className="app-shell">
@@ -897,7 +902,7 @@ export default function Dashboard({
                       <p>
                         {view === "Savings"
                           ? "Build your reserves, one contribution at a time."
-                          : "A place for every naira. Adjust as life happens."}
+                          : "A place for your money. Adjust as life happens."}
                       </p>
                     </div>
                     <Button
@@ -1149,7 +1154,9 @@ export default function Dashboard({
                           axisLine={false}
                           tickLine={false}
                           tick={{ fill: "#92968f", fontSize: 10 }}
-                          tickFormatter={(n) => `₦${n / 1000}k`}
+                          tickFormatter={(n) =>
+                            compactMoney(Number(n) * 100, currency)
+                          }
                         />
                         <Tooltip
                           formatter={(v) => money(Number(v) * 100)}
@@ -1316,7 +1323,7 @@ export default function Dashboard({
                   <h2>Your outgoings over time</h2>
                   <p>
                     Recorded payments across all budget items, including
-                    savings.
+                    savings. Showing {currency} months only.
                   </p>
                 </div>
                 <span className="count-pill">
@@ -1345,7 +1352,9 @@ export default function Dashboard({
                       axisLine={false}
                       tickLine={false}
                       tick={{ fill: "#92968f", fontSize: 10 }}
-                      tickFormatter={(n) => `₦${n / 1000}k`}
+                      tickFormatter={(n) =>
+                        compactMoney(Number(n) * 100, currency)
+                      }
                     />
                     <Tooltip formatter={(v) => money(Number(v) * 100)} />
                     <Line
@@ -1375,6 +1384,17 @@ export default function Dashboard({
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         budgets={budgets}
+        budget={budget}
+        onCurrencyChange={async (nextCurrency: Currency) => {
+          const ok = await mutate(
+            (items) =>
+              items.map((b) =>
+                b.id === selected ? { ...b, currency: nextCurrency } : b,
+              ),
+            `Currency changed to ${nextCurrency}. Amounts are unchanged.`,
+          );
+          if (!ok) throw new Error("Could not save the currency choice.");
+        }}
         syncAvailable={syncAvailable}
         connected={connected}
         email={syncEmail}
@@ -1416,7 +1436,7 @@ export default function Dashboard({
         }
         description={
           modal === "expense"
-            ? "Give every naira a purpose. All amounts are in NGN."
+            ? `Give your money a purpose. All amounts are in ${currency}.`
             : modal === "salary"
               ? "Choose the income you want to plan this month around."
               : modal === "delete"
@@ -1462,7 +1482,7 @@ export default function Dashboard({
                 : modal === "payment"
                   ? "Payment amount"
                   : "Expected amount"}{" "}
-              (₦)
+              ({currency} · {currencies[currency].symbol})
               <input
                 autoFocus={modal !== "expense"}
                 required
