@@ -6,10 +6,24 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
 };
+const title = "Pocket — Your monthly budget";
+const description =
+  "A little clarity for your money. Plan, track, and make room for what matters.";
+
 export const metadata: Metadata = {
-  title: "Pocket — Your monthly budget",
-  description:
-    "A little clarity for your money. Plan, track, and make room for what matters.",
+  metadataBase: new URL("https://pbt-tracker.vercel.app"),
+  title,
+  description,
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: "Pocket",
+    title,
+    description,
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
 };
 export default function RootLayout({
   children,
