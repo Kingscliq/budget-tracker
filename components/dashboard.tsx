@@ -1063,38 +1063,13 @@ export default function Dashboard({
                                 {money(actual(e))}
                               </button>
                             </td>
-                            <td
-                              data-label="Status"
-                              className="payment-status-cell"
-                            >
-                              <button
-                                disabled={
-                                  !e.is_active || busy || paymentLimit(e) === 0
-                                }
-                                className="payment-status-action"
-                                aria-label={`Record a payment for ${e.name}. ${status(e)}`}
-                                onClick={() => openPayment(e)}
-                                title={
-                                  e.is_active
-                                    ? paymentLimit(e) === 0
-                                      ? "Fully paid. Edit the planned amount to add more."
-                                      : "Record a payment"
-                                    : "Restore this item to record a payment"
-                                }
+                            <td data-label="Status">
+                              <span
+                                className={`status status-${status(e).toLowerCase().replaceAll(" ", "-")}`}
                               >
-                                <span
-                                  className={`status status-${status(e).toLowerCase().replaceAll(" ", "-")}`}
-                                >
-                                  <span />
-                                  {status(e)}
-                                </span>
-                                {e.is_active && paymentLimit(e) > 0 && (
-                                  <span className="payment-status-hint">
-                                    <Plus size={11} aria-hidden="true" /> Add
-                                    payment
-                                  </span>
-                                )}
-                              </button>
+                                <span aria-hidden="true" />
+                                {status(e)}
+                              </span>
                             </td>
                             <td className="center" data-label="Active">
                               <Switch.Root
@@ -1140,8 +1115,8 @@ export default function Dashboard({
                                   onClick={() => openPayment(e)}
                                 >
                                   <Plus size={16} />
-                                  <span className="mobile-action-label">
-                                    Record payment
+                                  <span className="payment-action-label">
+                                    Add payment
                                   </span>
                                 </button>
                                 <button

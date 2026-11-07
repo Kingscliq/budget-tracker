@@ -2732,53 +2732,22 @@ a {
 /* Keep optional notes below the name and category in the visual hierarchy. */
 .expense-name-button .expense-description {
   margin-top: 4px;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 400;
   line-height: 1.5;
-  color: #858e7c;
+  color: #727c6d;
   -webkit-line-clamp: 1;
-}
-.payment-status-cell {
-  padding: 0;
-  position: relative;
-}
-.payment-status-action::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-}
-.payment-status-action {
-  width: 100%;
-  min-height: 70px;
-  padding: 12px 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 6px;
-  border-radius: 6px;
-  text-align: left;
-}
-.payment-status-action:not(:disabled):hover,
-.payment-status-action:not(:disabled):focus-visible {
-  background: var(--soft);
-}
-.payment-status-action:disabled {
-  opacity: 1;
-}
-.payment-status-hint {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 9px;
-  color: var(--green);
 }
 .row-actions .payment-add-button {
   background: var(--soft);
   color: var(--green);
   border: 1px solid #dce6d5;
-  width: 30px;
+  width: auto;
   height: 30px;
+  gap: 5px;
+  padding: 0 8px;
+  font-size: 10px;
+  white-space: nowrap;
   opacity: 1;
 }
 .welcome-video-dialog {
@@ -2867,22 +2836,11 @@ a {
 }
 @media (max-width: 580px) {
   .expense-name-button .expense-description {
-    font-size: 10px;
+    font-size: 9px;
   }
-  .table-scroll .payment-status-cell {
-    align-self: stretch;
-  }
-  .payment-status-action {
-    min-height: 64px;
-    padding: 0;
-    gap: 4px;
-  }
-  .payment-status-action .status {
+  .table-scroll .status {
     min-height: auto;
     padding: 6px 8px;
-    font-size: 11px;
-  }
-  .payment-status-hint {
     font-size: 11px;
   }
   .welcome-video-preview {

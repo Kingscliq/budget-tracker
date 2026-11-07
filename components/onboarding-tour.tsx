@@ -16,7 +16,7 @@ const steps = [
   {
     target: "payment",
     title: "Record what you spend",
-    text: "Use this + button to record a payment and add a note. You can also click the Status area. The Actual amount opens your payment history.",
+    text: "Use + Add payment to record what you spend and add a note. Status shows your progress; click the Actual amount to see payment history.",
   },
   {
     target: "savings",
@@ -173,7 +173,7 @@ export function OnboardingTour({ onFinish }: { onFinish: () => void }) {
         <h2 id="tour-title">{current.title}</h2>
         <p id="tour-description">
           {paymentUnavailable
-            ? "When an active expense has an amount remaining, use its + button or Status area to record a payment. Click its Actual amount to see past payments."
+            ? "When an active expense has an amount remaining, use + Add payment to record a payment. Status shows your progress; click the Actual amount to see past payments."
             : current.text}
         </p>
         <div className="tour-footer">
