@@ -2666,6 +2666,9 @@ a {
 .migration-card p {
   line-height: 1.65;
 }
+.migration-card > [role="status"] + .btn {
+  margin-top: 20px;
+}
 .migration-brand {
   font-size: 11px;
   letter-spacing: 3px;
