@@ -7,6 +7,8 @@ export function Analytics({ measurementId }: { measurementId: string }) {
   const [enabled, setEnabled] = useState(false);
   useEffect(() => {
     try {
+      // Migration pages never load third-party scripts while handling a budget.
+      if (location.pathname.startsWith("/migrate")) return;
       setEnabled(localStorage.getItem("pocket-analytics") !== "off");
     } catch {
       /* Leave analytics off if browser storage is unavailable. */
