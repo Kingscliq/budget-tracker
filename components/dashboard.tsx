@@ -70,6 +70,7 @@ import {
 } from "@/lib/cloud-client";
 import { validateBudgets, parseBackup, MAX_BACKUP_BYTES } from "@/lib/backup";
 import { BudgetSettings } from "./budget-settings";
+import { WelcomeVideo, WELCOME_VIDEO_STORAGE } from "./welcome-video";
 import { OnboardingTour } from "./onboarding-tour";
 import { trackEvent } from "@/lib/analytics";
 const STORAGE = "pocket-budget-v1";
@@ -99,7 +100,8 @@ export default function Dashboard({
   const [connected, setConnected] = useState(false),
     [syncEmail, setSyncEmail] = useState(""),
     [settingsOpen, setSettingsOpen] = useState(false),
-    [tourOpen, setTourOpen] = useState(false);
+    [tourOpen, setTourOpen] = useState(false),
+    [videoOpen, setVideoOpen] = useState(false);
   const revision = useRef<number | null>(null);
   const operation = useRef(false);
   const firstInit = useRef(false);
@@ -162,15 +164,23 @@ export default function Dashboard({
               b.month === now.getMonth() + 1 && b.year === now.getFullYear(),
           )?.id ?? list.at(-1)!.id,
         );
-        setTourOpen(localStorage.getItem("pocket-tour-v1") !== "done");
+        const showVideo =
+          localStorage.getItem(WELCOME_VIDEO_STORAGE) !== "done";
+        setVideoOpen(showVideo);
+        // Offer a choice once; never queue a second automatic interruption.
+        setTourOpen(false);
         const callback = new URLSearchParams(location.search).get("sync");
         if (callback === "verified") {
+          setVideoOpen(false);
+          setTourOpen(false);
           setSettingsOpen(true);
           setNotice(
             "Email verified. Turn on sync in Settings to choose your budget.",
           );
         }
         if (callback === "error") {
+          setVideoOpen(false);
+          setTourOpen(false);
           setError(
             "That sign-in link expired or was opened in another browser. Request a new email from Settings and open it in the same browser.",
           );
@@ -293,6 +303,14 @@ export default function Dashboard({
     if (!ok) throw new Error("Could not restore this backup.");
     setSelected(value[0].id);
     trackEvent("backup_restored");
+  }
+  function dismissVideo() {
+    setVideoOpen(false);
+    try {
+      localStorage.setItem(WELCOME_VIDEO_STORAGE, "done");
+    } catch {
+      /* Dismiss for this visit even if storage is unavailable. */
+    }
   }
   function finishTour() {
     setTourOpen(false);
@@ -1045,19 +1063,37 @@ export default function Dashboard({
                                 {money(actual(e))}
                               </button>
                             </td>
-                            <td data-label="Status">
+                            <td
+                              data-label="Status"
+                              className="payment-status-cell"
+                            >
                               <button
-                                disabled={!e.is_active || busy}
-                                className={`status status-${status(e).toLowerCase().replaceAll(" ", "-")}`}
+                                disabled={
+                                  !e.is_active || busy || paymentLimit(e) === 0
+                                }
+                                className="payment-status-action"
+                                aria-label={`Record a payment for ${e.name}. ${status(e)}`}
                                 onClick={() => openPayment(e)}
                                 title={
                                   e.is_active
-                                    ? "Record a payment"
+                                    ? paymentLimit(e) === 0
+                                      ? "Fully paid. Edit the planned amount to add more."
+                                      : "Record a payment"
                                     : "Restore this item to record a payment"
                                 }
                               >
-                                <span />
-                                {status(e)}
+                                <span
+                                  className={`status status-${status(e).toLowerCase().replaceAll(" ", "-")}`}
+                                >
+                                  <span />
+                                  {status(e)}
+                                </span>
+                                {e.is_active && paymentLimit(e) > 0 && (
+                                  <span className="payment-status-hint">
+                                    <Plus size={11} aria-hidden="true" /> Add
+                                    payment
+                                  </span>
+                                )}
                               </button>
                             </td>
                             <td className="center" data-label="Active">
@@ -1084,10 +1120,23 @@ export default function Dashboard({
                             <td>
                               <div className="row-actions">
                                 <button
-                                  className="icon-button"
-                                  title="Record payment"
+                                  className="icon-button payment-add-button"
+                                  data-tour={
+                                    e.is_active && paymentLimit(e) > 0
+                                      ? "payment"
+                                      : undefined
+                                  }
+                                  title={
+                                    paymentLimit(e) === 0
+                                      ? "Fully paid. Edit the planned amount to add more."
+                                      : "Record payment"
+                                  }
                                   aria-label={`Record payment for ${e.name}`}
-                                  disabled={!e.is_active || busy}
+                                  disabled={
+                                    !e.is_active ||
+                                    busy ||
+                                    paymentLimit(e) === 0
+                                  }
                                   onClick={() => openPayment(e)}
                                 >
                                   <Plus size={16} />
@@ -1446,13 +1495,34 @@ export default function Dashboard({
         onUpload={uploadDevice}
         onDisconnect={stopSync}
         onRestore={restoreBackup}
+        onWatchVideo={() => {
+          setSettingsOpen(false);
+          setTourOpen(false);
+          setVideoOpen(true);
+        }}
         onReplay={() => {
           setSettingsOpen(false);
           setView("Overview");
+          setSearch("");
+          setFilter("All items");
           setTourOpen(true);
         }}
       />
-      {tourOpen && !settingsOpen && <OnboardingTour onFinish={finishTour} />}
+      {videoOpen && !settingsOpen && !modal && (
+        <WelcomeVideo
+          onClose={dismissVideo}
+          onTour={() => {
+            dismissVideo();
+            setView("Overview");
+            setSearch("");
+            setFilter("All items");
+            setTourOpen(true);
+          }}
+        />
+      )}
+      {tourOpen && !videoOpen && !settingsOpen && !modal && (
+        <OnboardingTour onFinish={finishTour} />
+      )}
       {notice && (
         <div className="toast" role="status">
           <CheckCircle2 size={17} />

@@ -2728,3 +2728,193 @@ a {
   height: 32px;
   font-size: 22px;
 }
+
+/* Keep optional notes below the name and category in the visual hierarchy. */
+.expense-name-button .expense-description {
+  margin-top: 4px;
+  font-size: 9px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #858e7c;
+  -webkit-line-clamp: 1;
+}
+.payment-status-cell {
+  padding: 0;
+  position: relative;
+}
+.payment-status-action::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.payment-status-action {
+  width: 100%;
+  min-height: 70px;
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 6px;
+  text-align: left;
+}
+.payment-status-action:not(:disabled):hover,
+.payment-status-action:not(:disabled):focus-visible {
+  background: var(--soft);
+}
+.payment-status-action:disabled {
+  opacity: 1;
+}
+.payment-status-hint {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  color: var(--green);
+}
+.row-actions .payment-add-button {
+  background: var(--soft);
+  color: var(--green);
+  border: 1px solid #dce6d5;
+  width: 30px;
+  height: 30px;
+  opacity: 1;
+}
+.welcome-video-dialog {
+  width: min(760px, calc(100% - 32px));
+  padding: clamp(22px, 4vw, 36px);
+}
+.welcome-video-dialog h2 {
+  padding-right: 24px;
+}
+.welcome-video-player {
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #eff4e9;
+}
+.welcome-video-player iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+.welcome-video-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: 10px;
+  color: var(--green);
+  background:
+    radial-gradient(ellipse at 80% 15%, #dce8cf, transparent 65%), #eff4e9;
+}
+.welcome-video-preview:focus-visible {
+  outline-offset: -5px;
+}
+.welcome-video-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.7px;
+}
+.welcome-video-play {
+  display: grid;
+  place-items: center;
+  padding-left: 3px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--green);
+  color: white;
+  margin: 8px 0;
+}
+.welcome-video-preview strong {
+  font-size: 18px;
+  font-weight: 500;
+}
+.welcome-video-preview > span:last-child {
+  font-size: 12px;
+  color: #67765e;
+}
+.welcome-video-actions {
+  margin-top: 22px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.welcome-video-external {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--green);
+  text-decoration: underline;
+}
+.welcome-video-dialog .welcome-video-hint {
+  font-size: 11px;
+  color: #77846b;
+  padding: 0;
+  margin: 16px 0 0;
+}
+@media (max-width: 580px) {
+  .expense-name-button .expense-description {
+    font-size: 10px;
+  }
+  .table-scroll .payment-status-cell {
+    align-self: stretch;
+  }
+  .payment-status-action {
+    min-height: 64px;
+    padding: 0;
+    gap: 4px;
+  }
+  .payment-status-action .status {
+    min-height: auto;
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+  .payment-status-hint {
+    font-size: 11px;
+  }
+  .welcome-video-preview {
+    gap: 5px;
+  }
+  .welcome-video-mark {
+    font-size: 15px;
+  }
+  .welcome-video-mark svg {
+    width: 18px;
+    height: 18px;
+  }
+  .welcome-video-play {
+    width: 40px;
+    height: 40px;
+    margin: 3px 0;
+  }
+  .welcome-video-play svg {
+    width: 18px;
+    height: 18px;
+  }
+  .welcome-video-preview strong {
+    font-size: 15px;
+  }
+  .welcome-video-preview > span:last-child {
+    font-size: 10px;
+  }
+}
+@media (max-width: 580px) {
+  .row-actions .payment-add-button {
+    min-height: 44px;
+    height: 44px;
+    width: auto;
+  }
+}

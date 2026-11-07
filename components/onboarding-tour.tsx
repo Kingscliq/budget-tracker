@@ -14,6 +14,11 @@ const steps = [
     text: "Add or edit an expense, then record payments as you go. Cancel an item to free its unpaid amount.",
   },
   {
+    target: "payment",
+    title: "Record what you spend",
+    text: "Use this + button to record a payment and add a note. You can also click the Status area. The Actual amount opens your payment history.",
+  },
+  {
     target: "savings",
     title: "Make room for future you",
     text: "Savings are part of your monthly expenses. Set a target here and record contributions in your main budget.",
@@ -27,7 +32,8 @@ const steps = [
 export function OnboardingTour({ onFinish }: { onFinish: () => void }) {
   const [step, setStep] = useState(0),
     [position, setPosition] = useState({ top: 90, left: 16 }),
-    [placed, setPlaced] = useState(false);
+    [placed, setPlaced] = useState(false),
+    [paymentUnavailable, setPaymentUnavailable] = useState(false);
   const card = useRef<HTMLDivElement>(null);
   const originalFocus = useRef<HTMLElement | null>(null);
   const current = steps[step];
@@ -53,9 +59,17 @@ export function OnboardingTour({ onFinish }: { onFinish: () => void }) {
     };
   }, []);
   useLayoutEffect(() => {
-    const target = document.querySelector<HTMLElement>(
+    const specificTarget = document.querySelector<HTMLElement>(
       `[data-tour="${current.target}"]`,
     );
+    setPaymentUnavailable(current.target === "payment" && !specificTarget);
+    const target =
+      specificTarget ??
+      document.querySelector<HTMLElement>(
+        current.target === "payment"
+          ? '[data-tour="expenses"]'
+          : '[data-tour="settings"]',
+      );
     if (!target) return;
     target.setAttribute("data-tour-active", "true");
     const reducedMotion = window.matchMedia(
@@ -157,7 +171,11 @@ export function OnboardingTour({ onFinish }: { onFinish: () => void }) {
           <X size={16} />
         </button>
         <h2 id="tour-title">{current.title}</h2>
-        <p id="tour-description">{current.text}</p>
+        <p id="tour-description">
+          {paymentUnavailable
+            ? "When an active expense has an amount remaining, use its + button or Status area to record a payment. Click its Actual amount to see past payments."
+            : current.text}
+        </p>
         <div className="tour-footer">
           <button onClick={() => finish()}>Skip tour</button>
           <div>

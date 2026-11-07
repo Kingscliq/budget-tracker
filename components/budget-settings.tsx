@@ -7,6 +7,7 @@ import {
   HardDrive,
   Cloud,
   HelpCircle,
+  PlayCircle,
   ArrowRight,
   Check,
   Loader2,
@@ -43,6 +44,7 @@ type Props = {
   onDisconnect: () => Promise<void>;
   onRestore: (budgets: Budget[]) => Promise<void>;
   onReplay: () => void;
+  onWatchVideo: () => void;
 };
 export function downloadBackup(budgets: Budget[], name = "pocket-backup") {
   const url = URL.createObjectURL(
@@ -71,6 +73,7 @@ export function BudgetSettings(props: Props) {
     onDisconnect,
     onRestore,
     onReplay,
+    onWatchVideo,
   } = props;
   const [currencyChoice, setCurrencyChoice] = useState<Currency>(
     budget.currency,
@@ -372,6 +375,14 @@ export function BudgetSettings(props: Props) {
                 your saved budget stays here.
               </p>
             </section>
+            <button
+              className="settings-replay"
+              disabled={busy}
+              onClick={onWatchVideo}
+            >
+              <PlayCircle size={17} /> Watch the video walkthrough{" "}
+              <ArrowRight size={14} />
+            </button>
             <button
               className="settings-replay"
               disabled={busy}
