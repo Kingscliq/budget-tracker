@@ -54,6 +54,10 @@ import {
   totals,
   validateAmount,
   validateExpense,
+  validatePaymentAmount,
+  paymentLimit,
+  normalizeDescription,
+  MAX_DESCRIPTION_LENGTH,
   type Budget,
   type Expense,
   type ExpenseInput,
@@ -107,6 +111,7 @@ export default function Dashboard({
     >(null),
     [editing, setEditing] = useState<Expense | null>(null);
   const [name, setName] = useState(""),
+    [description, setDescription] = useState(""),
     [category, setCategory] = useState<ExpenseInput["category"]>("Living"),
     [amount, setAmount] = useState(""),
     [recurring, setRecurring] = useState(true),
@@ -190,6 +195,10 @@ export default function Dashboard({
   const summary = budget ? totals(budget) : null;
   const currency = budget?.currency ?? "NGN";
   const money = (amount: number) => formatMoney(amount, currency);
+  const paymentExpense = budget?.expenses.find(
+    (expense) => expense.id === editing?.id,
+  );
+  const maxPayment = paymentExpense ? paymentLimit(paymentExpense) : 0;
   async function persist(next: Budget[]) {
     const clean = validateBudgets(next);
     // Mark before saving locally so a closed tab cannot silently lose an unsynced edit.
@@ -321,6 +330,7 @@ export default function Dashboard({
   function openExpense(e?: Expense) {
     setEditing(e ?? null);
     setName(e?.name ?? "");
+    setDescription(e?.description ?? "");
     setCategory(e?.category ?? (view === "Savings" ? "Savings" : "Living"));
     setAmount(e ? String(e.expected_amount / 100) : "");
     setRecurring(e?.is_recurring ?? true);
@@ -329,7 +339,8 @@ export default function Dashboard({
   }
   function openPayment(e: Expense) {
     setEditing(e);
-    setAmount(String(Math.max(0, e.expected_amount - actual(e)) / 100 || ""));
+    setDescription("");
+    setAmount("");
     setDate(dateToday());
     setFormError("");
     setModal("payment");
@@ -353,6 +364,7 @@ export default function Dashboard({
       if (modal === "expense") {
         const input: ExpenseInput = {
           name: name.trim(),
+          description: normalizeDescription(description),
           category,
           expected_amount: kobo,
           is_recurring: recurring,
@@ -386,8 +398,14 @@ export default function Dashboard({
         );
       }
       if (modal === "payment" && editing) {
+        if (!paymentExpense)
+          throw new Error(
+            "This expense could not be found. Reopen the payment form.",
+          );
+        validatePaymentAmount(kobo, paymentExpense);
         if (!date || Number.isNaN(Date.parse(date)))
           throw new Error("Choose a payment date.");
+        const paymentDescription = normalizeDescription(description);
         ok = await mutate(
           changeExpense(editing.id, (e) => ({
             ...e,
@@ -398,6 +416,7 @@ export default function Dashboard({
                 expense_id: e.id,
                 amount: kobo,
                 paid_at: date,
+                description: paymentDescription,
               },
             ],
           })),
@@ -465,6 +484,8 @@ export default function Dashboard({
         `Actual ${currency}`,
         "Status",
         "Recurring",
+        "Description",
+        "Payment descriptions",
       ],
       ...budget.expenses.map((e) => [
         e.name,
@@ -473,6 +494,14 @@ export default function Dashboard({
         actual(e) / 100,
         status(e),
         e.is_recurring ? "Yes" : "No",
+        e.description ?? "",
+        e.payments
+          .filter((p) => p.description)
+          .map(
+            (p) =>
+              `${p.paid_at} (${p.amount / 100} ${currency}): ${p.description}`,
+          )
+          .join("\n"),
       ]),
     ];
     const blob = new Blob(
@@ -535,7 +564,11 @@ export default function Dashboard({
     );
   const rows = budget.expenses
     .filter((e) => (view === "Savings" ? e.category === "Savings" : true))
-    .filter((e) => e.name.toLowerCase().includes(search.toLowerCase()))
+    .filter((e) =>
+      `${e.name} ${e.description ?? ""}`
+        .toLowerCase()
+        .includes(search.toLowerCase()),
+    )
     .filter(
       (e) =>
         filter === "All items" ||
@@ -848,6 +881,11 @@ export default function Dashboard({
                               ).toLocaleDateString("en-GB")}{" "}
                               · {e.category}
                             </small>
+                            {p.description && (
+                              <p className="entry-description">
+                                {p.description}
+                              </p>
+                            )}
                           </div>
                           <strong>{money(p.amount)}</strong>
                           <button
@@ -981,6 +1019,11 @@ export default function Dashboard({
                                     {e.category} <span>·</span>{" "}
                                     {e.is_recurring ? "Recurring" : "One-off"}
                                   </small>
+                                  {e.description && (
+                                    <span className="entry-description expense-description">
+                                      {e.description}
+                                    </span>
+                                  )}
                                 </button>
                               </div>
                             </td>
@@ -1489,13 +1532,24 @@ export default function Dashboard({
                 type="number"
                 inputMode="decimal"
                 min={modal === "salary" ? "0" : "0.01"}
-                max="1000000000"
+                max={modal === "payment" ? maxPayment / 100 : 1000000000}
+                disabled={modal === "payment" && maxPayment === 0}
+                aria-describedby={
+                  modal === "payment" ? "payment-limit" : undefined
+                }
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
               />
             </label>
+            {modal === "payment" && (
+              <small id="payment-limit" className="amount-hint">
+                {maxPayment > 0
+                  ? `Up to ${money(maxPayment)} remaining for this expense.`
+                  : "Fully paid. Increase the planned amount to record another payment."}
+              </small>
+            )}
             {modal === "payment" && (
               <label>
                 Payment date
@@ -1505,6 +1559,25 @@ export default function Dashboard({
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                 />
+              </label>
+            )}
+            {(modal === "expense" || modal === "payment") && (
+              <label>
+                Description (optional)
+                <textarea
+                  rows={3}
+                  maxLength={MAX_DESCRIPTION_LENGTH}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder={
+                    modal === "expense"
+                      ? "e.g. Weekly groceries and household essentials"
+                      : "e.g. Vegetables and rice from the market"
+                  }
+                />
+                <small className="description-count">
+                  {description.length}/{MAX_DESCRIPTION_LENGTH} characters
+                </small>
               </label>
             )}
             {modal === "expense" && (
@@ -1532,7 +1605,10 @@ export default function Dashboard({
               >
                 Cancel
               </Button>
-              <Button disabled={busy} type="submit">
+              <Button
+                disabled={busy || (modal === "payment" && maxPayment === 0)}
+                type="submit"
+              >
                 {busy ? (
                   <Loader2 className="spin" size={15} />
                 ) : (
@@ -1590,6 +1666,9 @@ export default function Dashboard({
                         "en-GB",
                       )}
                     </small>
+                    {p.description && (
+                      <p className="entry-description">{p.description}</p>
+                    )}
                   </div>
                   <button
                     className="icon-button"

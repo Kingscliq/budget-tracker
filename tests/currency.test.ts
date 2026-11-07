@@ -40,7 +40,7 @@ test("every supported currency round-trips through sync validation and backups w
     paid_at: "2026-11-01",
   });
   const original = structuredClone(b);
-  assert.equal(JSON.parse(makeBackup([b])).version, 2);
+  assert.equal(JSON.parse(makeBackup([b])).version, 3);
   for (const currency of Object.keys(
     currencies,
   ) as (keyof typeof currencies)[]) {

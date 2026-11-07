@@ -1,6 +1,7 @@
 import {
   categories,
   isCurrency,
+  normalizeDescription,
   validateAmount,
   validateExpense,
   validateMonth,
@@ -53,6 +54,7 @@ export function validateBudgets(value: unknown): Budget[] {
         if (!p || typeof p !== "object") throw new Error("Invalid payment.");
         id(p.id);
         validateAmount(p.amount);
+        normalizeDescription(p.description);
         if (
           p.expense_id !== e.id ||
           typeof p.paid_at !== "string" ||
@@ -75,6 +77,9 @@ export function validateBudgets(value: unknown): Budget[] {
       id: e.id,
       budget_id: b.id,
       name: e.name,
+      ...(normalizeDescription(e.description)
+        ? { description: normalizeDescription(e.description) }
+        : {}),
       category: e.category,
       expected_amount: e.expected_amount,
       is_active: e.is_active,
@@ -84,6 +89,9 @@ export function validateBudgets(value: unknown): Budget[] {
         expense_id: e.id,
         amount: p.amount,
         paid_at: p.paid_at,
+        ...(normalizeDescription(p.description)
+          ? { description: normalizeDescription(p.description) }
+          : {}),
       })),
     })),
   }));
@@ -92,14 +100,14 @@ export function parseBackup(text: string): Budget[] {
   if (text.length > MAX_BACKUP_BYTES)
     throw new Error("Choose a backup smaller than 750 KB.");
   const data = JSON.parse(text);
-  if (data?.format !== "pocket-budget" || ![1, 2].includes(data?.version))
+  if (data?.format !== "pocket-budget" || ![1, 2, 3].includes(data?.version))
     throw new Error("This is not a supported Pocket backup.");
   return validateBudgets(data.budgets);
 }
 export function makeBackup(budgets: Budget[]) {
   return JSON.stringify({
     format: "pocket-budget",
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     budgets: validateBudgets(budgets),
   });

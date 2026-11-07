@@ -22,7 +22,8 @@ body {
 }
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 button,
@@ -54,7 +55,8 @@ a {
 }
 button,
 input,
-select {
+select,
+textarea {
   transition:
     background 0.15s,
     border-color 0.15s,
@@ -1173,7 +1175,8 @@ tr:hover .delete-action {
   margin: 0 0 17px;
 }
 .dialog-content input:not([type="checkbox"]),
-.dialog-content select {
+.dialog-content select,
+.dialog-content textarea {
   display: block;
   width: 100%;
   border: 1px solid #e2e8d9;
@@ -2194,7 +2197,8 @@ a {
     font-size: 13px;
   }
   .dialog-content input:not([type="checkbox"]),
-  .dialog-content select {
+  .dialog-content select,
+  .dialog-content textarea {
     font-size: 16px;
     min-height: 48px;
   }
@@ -2593,4 +2597,45 @@ a {
   display: block;
   margin-top: 12px;
   width: 100%;
+}
+
+
+.dialog-content textarea {
+  resize: vertical;
+  min-height: 96px;
+  line-height: 1.6;
+}
+.description-count {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: right;
+}
+.entry-description {
+  display: block;
+  margin: 7px 0 0;
+  color: #64705f;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.expense-description {
+  max-width: 260px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.transaction > div {
+  min-width: 0;
+}
+
+.amount-hint {
+  display: block;
+  margin: -9px 0 17px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #77846b;
 }

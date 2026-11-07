@@ -86,4 +86,13 @@ Users can disable analytics for their browser in Settings → Usage analytics. C
 
 Settings → Currency for this month supports NGN, USD, GBP, EUR, and GHS. Each month stores its own currency; existing records and version 1 backups without a currency load as NGN. Changing currency never converts or rescales income, expenses, or recorded payments. New months inherit the selected month’s currency. Copying a previous month keeps the destination currency and copies the numeric amounts unchanged.
 
-Dashboard amounts, form labels, chart ticks/tooltips, payment history, and CSV headers use the selected month’s currency. Trends include only months in that currency. JSON backups use version 2 to preserve currency and prevent older clients from silently importing foreign-currency amounts as NGN; version 1 backups remain readable. Supabase snapshots preserve currency via the existing JSON schema, so no database migration is required.
+Dashboard amounts, form labels, chart ticks/tooltips, payment history, and CSV headers use the selected month’s currency. Trends include only months in that currency. JSON backups use version 3 to preserve currency and descriptions. Versions 1 and 2 remain readable. Supabase snapshots preserve currency via the existing JSON schema, so no database migration is required.
+
+
+## Expense and spend descriptions
+
+Expenses and individual payments accept optional plain-text descriptions up to 1,000 characters. Expense descriptions can be edited from the monthly plan and searched with expense names. Payment descriptions appear in Transactions and payment history. Both are preserved in local storage, cloud snapshots, version 3 backups, and monthly CSV exports. Recurring-plan copies keep expense descriptions and start with an empty payment history.
+
+Payment amount fields start empty and show the remaining planned amount below the field. New payments are capped at that amount. To record more against a fully paid expense, increase its planned amount first. Existing records continue to load and calculate normally.
+
+The future intelligence and voice proposal is in [docs/intelligence-and-voice-roadmap.md](docs/intelligence-and-voice-roadmap.md).

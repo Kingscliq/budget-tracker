@@ -35,11 +35,13 @@ export type Payment = {
   expense_id: string;
   amount: number;
   paid_at: string;
+  description?: string;
 };
 export type Expense = {
   id: string;
   budget_id: string;
   name: string;
+  description?: string;
   category: Category;
   expected_amount: number;
   is_active: boolean;
@@ -56,7 +58,7 @@ export type Budget = {
 };
 export type ExpenseInput = Pick<
   Expense,
-  "name" | "category" | "expected_amount" | "is_recurring"
+  "name" | "description" | "category" | "expected_amount" | "is_recurring"
 >;
 export const money = (minorUnits: number, currency: Currency = "NGN") =>
   new Intl.NumberFormat("en-NG", {
@@ -188,6 +190,30 @@ export function validateAmount(n: number, zero = false) {
       "Enter a valid amount up to 1 billion in the selected currency.",
     );
 }
+export const paymentLimit = (expense: Expense) =>
+  expense.is_active
+    ? Math.max(0, expense.expected_amount - actual(expense))
+    : 0;
+
+export function validatePaymentAmount(amount: number, expense: Expense) {
+  validateAmount(amount);
+  if (!expense.is_active)
+    throw new Error("Restore this expense before recording a payment.");
+  if (amount > paymentLimit(expense))
+    throw new Error(
+      "Enter an amount within the remaining planned amount shown below the field.",
+    );
+}
+
+export const MAX_DESCRIPTION_LENGTH = 1000;
+export function normalizeDescription(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || value.length > MAX_DESCRIPTION_LENGTH)
+    throw new Error(
+      `Enter a description of up to ${MAX_DESCRIPTION_LENGTH} characters.`,
+    );
+  return value.trim() || undefined;
+}
 export function validateExpense(e: ExpenseInput) {
   if (
     !e.name.trim() ||
@@ -197,6 +223,7 @@ export function validateExpense(e: ExpenseInput) {
   )
     throw new Error("Enter a name and valid category.");
   validateAmount(e.expected_amount);
+  normalizeDescription(e.description);
 }
 export function validateMonth(month: number, year: number) {
   if (
